@@ -1,0 +1,2386 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIR-OPD · Learning from Evolving Errors: Adaptive Iterative Repair for On-Policy Distillation</title>
+  <meta name="description" content="AIR-OPD: Adaptive Iterative Repair for On-Policy Distillation (arXiv:2610.02700). Replaces static reference-solution conditioning with multi-round error-aligned repair guidance and outcome-aware stage weighting.">
+  <meta property="og:title" content="Learning from Evolving Errors: Adaptive Iterative Repair for On-Policy Distillation (AIR-OPD)">
+  <meta property="og:description" content="Turn failed on-policy rollouts into learnable error-to-repair transitions. Improves Qwen3-4B & Qwen3-8B math reasoning by up to +3.6 pts over OPSD while preserving OOD generalization and converging 2.5× faster.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="figures/intro/teaser.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AIR-OPD · Learning from Evolving Errors">
+  <meta name="twitter:description" content="Adaptive Iterative Repair for On-Policy Distillation: +3.6 pts Math Avg over OPSD, near-zero OOD forgetting, 2.5× faster convergence.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --bg-subtle: #f1f5f9;
+      --surface: #ffffff;
+      --surface-elevated: #ffffff;
+      --surface-glass: rgba(255, 255, 255, 0.88);
+      --fg: #0f172a;
+      --fg-secondary: #334155;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+
+      /* Primary & Semantic Accents (HuggingFace Paper + Editorial Indigo/Amber/Teal Palette) */
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-soft: #eff6ff;
+      --primary-border: #bfdbfe;
+
+      --self-fg: #1d4ed8;
+      --self-bg: #eff6ff;
+      --self-border: #93c5fd;
+
+      --ext-fg: #c2410c;
+      --ext-bg: #fff7ed;
+      --ext-border: #fdba74;
+
+      --ok-fg: #0f766e;
+      --ok-bg: #f0fdfa;
+      --ok-border: #5eead4;
+
+      --warn-fg: #b45309;
+      --warn-bg: #fffbeb;
+      --warn-border: #fcd34d;
+
+      --danger-fg: #be123c;
+      --danger-bg: #fff1f2;
+      --danger-border: #fda4af;
+
+      --anchor-bg: #fef08a;
+      --anchor-fg: #713f12;
+      --region-bg: rgba(37, 99, 235, 0.09);
+      --region-border: #3b82f6;
+
+      --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+      --shadow-lg: 0 12px 28px -6px rgba(15, 23, 42, 0.08), 0 4px 10px -3px rgba(15, 23, 42, 0.04);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-serif: 'Newsreader', Georgia, serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0b0f19;
+      --bg-subtle: #111827;
+      --surface: #131c2e;
+      --surface-elevated: #1a263d;
+      --surface-glass: rgba(19, 28, 46, 0.88);
+      --fg: #f8fafc;
+      --fg-secondary: #cbd5e1;
+      --muted: #94a3b8;
+      --border: #1e293b;
+      --border-strong: #334155;
+
+      --primary: #60a5fa;
+      --primary-hover: #93c5fd;
+      --primary-soft: rgba(59, 130, 246, 0.15);
+      --primary-border: rgba(96, 165, 250, 0.35);
+
+      --self-fg: #93c5fd;
+      --self-bg: rgba(37, 99, 235, 0.16);
+      --self-border: rgba(96, 165, 250, 0.4);
+
+      --ext-fg: #fdba74;
+      --ext-bg: rgba(234, 88, 12, 0.16);
+      --ext-border: rgba(251, 146, 60, 0.4);
+
+      --ok-fg: #5eead4;
+      --ok-bg: rgba(13, 148, 136, 0.16);
+      --ok-border: rgba(45, 212, 191, 0.38);
+
+      --warn-fg: #fcd34d;
+      --warn-bg: rgba(217, 119, 6, 0.16);
+      --warn-border: rgba(251, 191, 36, 0.38);
+
+      --danger-fg: #fda4af;
+      --danger-bg: rgba(225, 29, 72, 0.16);
+      --danger-border: rgba(251, 113, 133, 0.38);
+
+      --anchor-bg: rgba(234, 179, 8, 0.28);
+      --anchor-fg: #fef08a;
+      --region-bg: rgba(59, 130, 246, 0.16);
+      --region-border: #60a5fa;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.62;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Bilingual helper: default English, toggleable to Chinese */
+    html[data-lang="en"] .lang-zh { display: none !important; }
+    html[data-lang="zh"] .lang-en { display: none !important; }
+
+    /* Top Sticky Navigation */
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: var(--surface-glass);
+      border-bottom: 1px solid var(--border);
+    }
+    .topnav-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 0.96rem;
+      color: var(--fg);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+    .brand-badge {
+      background: linear-gradient(135deg, #2563eb, #ea580c);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .nav-links::-webkit-scrollbar { display: none; }
+    .nav-links a {
+      color: var(--fg-secondary);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .nav-links a:hover {
+      color: var(--primary);
+      background: var(--bg-subtle);
+    }
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .icon-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--fg-secondary);
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+    .icon-btn:hover {
+      border-color: var(--border-strong);
+      color: var(--fg);
+      background: var(--bg-subtle);
+    }
+
+    /* Layout Container */
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 60px 0 48px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -15%, rgba(37, 99, 235, 0.10), transparent),
+        radial-gradient(ellipse 60% 40% at 85% 10%, rgba(234, 88, 12, 0.07), transparent);
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 13px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      border: 1px solid var(--primary-border);
+      color: var(--primary);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 18px;
+    }
+    .hero-title {
+      font-size: clamp(1.95rem, 3.8vw, 3.05rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      margin: 0 0 18px;
+      color: var(--fg);
+    }
+    .hero-title .gradient-text {
+      background: linear-gradient(135deg, #2563eb 0%, #0d9488 52%, #ea580c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    [data-theme="dark"] .hero-title .gradient-text {
+      background: linear-gradient(135deg, #60a5fa 0%, #2dd4bf 52%, #fb923c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-subtitle {
+      font-size: clamp(1.02rem, 1.5vw, 1.16rem);
+      color: var(--fg-secondary);
+      max-width: 940px;
+      margin: 0 0 22px;
+      line-height: 1.65;
+    }
+    .author-block {
+      margin-bottom: 24px;
+      font-size: 0.92rem;
+      color: var(--fg-secondary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 34px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--fg);
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-strong);
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+      color: #ffffff;
+    }
+
+    .btn-disabled { cursor: default; opacity: 0.8; border-style: dashed; box-shadow: none; }
+    .btn-disabled:hover { transform: none; box-shadow: none; border-color: var(--border); }
+    .btn-badge { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 700; padding: 2px 6px; border-radius: 5px;
+      background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); letter-spacing: 0.03em; }
+    /* TL;DR Banner */
+    .tldr-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+      font-size: 0.92rem;
+      color: var(--fg-secondary);
+    }
+    .tldr-box strong { color: var(--fg); }
+
+    /* Hero KPI Strip */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+    @media (max-width: 920px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .kpi-grid { grid-template-columns: 1fr; }
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--primary);
+    }
+    .kpi-card.kpi-ext::before { background: #ea580c; }
+    .kpi-card.kpi-ok::before { background: #0d9488; }
+    .kpi-card.kpi-warn::before { background: #d97706; }
+    .kpi-tag {
+      font-family: var(--font-mono);
+      font-size: 0.71rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .kpi-val {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 4px 0 4px;
+      color: var(--fg);
+    }
+    .kpi-desc {
+      font-size: 0.8rem;
+      color: var(--fg-secondary);
+      line-height: 1.45;
+    }
+
+    /* Section Headings */
+    .section-header {
+      margin-bottom: 28px;
+    }
+    .section-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    .section-title {
+      font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin: 0 0 10px;
+      color: var(--fg);
+    }
+    .section-desc {
+      font-size: 0.96rem;
+      color: var(--fg-secondary);
+      max-width: 880px;
+      margin: 0;
+    }
+
+    /* Cards & Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    @media (max-width: 920px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+    .grid-2 > *, .grid-3 > *, .kpi-grid > * { min-width: 0; }
+    .grid-3 .formula-box { font-size: 0.74rem; padding: 10px 10px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .card-title {
+      font-size: 1.04rem;
+      font-weight: 700;
+      margin: 0;
+      color: var(--fg);
+    }
+
+    /* Badges & Pills */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .pill-self { background: var(--self-bg); color: var(--self-fg); border-color: var(--self-border); }
+    .pill-ext  { background: var(--ext-bg);  color: var(--ext-fg);  border-color: var(--ext-border); }
+    .pill-ok   { background: var(--ok-bg);   color: var(--ok-fg);   border-color: var(--ok-border); }
+    .pill-warn { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-border); }
+    .pill-danger { background: var(--danger-bg); color: var(--danger-fg); border-color: var(--danger-border); }
+    .pill-neutral { background: var(--bg-subtle); color: var(--fg-secondary); border-color: var(--border); }
+
+    /* Figure Frame */
+    .figure-frame {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-md);
+      margin-top: 20px;
+    }
+    .figure-img-wrap {
+      background: #ffffff;
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      text-align: center;
+    }
+    .figure-img-wrap img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+    .figure-caption {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: var(--fg-secondary);
+      line-height: 1.55;
+    }
+    .figure-caption strong { color: var(--fg); }
+
+    /* Formula Block */
+    .formula-box {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      margin: 12px 0;
+      overflow-x: auto;
+      font-size: 0.9rem;
+    }
+
+    /* Interactive Tabs & Buttons */
+    .explorer-shell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    .explorer-tabs {
+      display: flex;
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .exp-tab {
+      flex: 1;
+      min-width: 190px;
+      padding: 14px 18px;
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--border);
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      text-align: left;
+      font-family: var(--font-sans);
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--fg-secondary);
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .exp-tab:last-child { border-right: none; }
+    .exp-tab:hover { background: rgba(37, 99, 235, 0.04); color: var(--fg); }
+    .exp-tab.active {
+      background: var(--surface);
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .explorer-body { padding: 24px; }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .seg-btn {
+      padding: 7px 13px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--fg-secondary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .seg-btn:hover {
+      border-color: var(--primary);
+      color: var(--fg);
+    }
+    .seg-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    /* Code & Trace Boxes */
+    .code-box {
+      font-family: var(--font-mono);
+      font-size: 0.79rem;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 13px 15px;
+      line-height: 1.58;
+      color: var(--fg);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .anchor-mark {
+      background: var(--anchor-bg);
+      color: var(--anchor-fg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      border: 1px solid rgba(202, 138, 4, 0.45);
+    }
+    .region-mark {
+      background: var(--region-bg);
+      border-left: 3px solid var(--region-border);
+      padding: 8px 12px;
+      margin: 6px 0;
+      border-radius: 0 6px 6px 0;
+      display: block;
+    }
+    .unsupervised-dim {
+      opacity: 0.52;
+    }
+
+    /* Corrective Mass Bar Chart in Sandbox */
+    .mass-bars {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      margin: 14px 0;
+    }
+    @media (max-width: 720px) {
+      .mass-bars { grid-template-columns: repeat(2, 1fr); }
+    }
+    .mass-col {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+    .mass-col.supervised {
+      background: var(--self-bg);
+      border-color: var(--self-border);
+      box-shadow: 0 0 0 1px var(--self-border);
+    }
+    .mass-col.anchor-start {
+      border-color: #eab308;
+      box-shadow: 0 0 0 1.5px #eab308;
+    }
+    .mass-bar-track {
+      height: 68px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: flex;
+      align-items: flex-end;
+      padding: 3px;
+      margin: 8px 0;
+    }
+    .mass-bar-fill {
+      width: 100%;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+      transition: height 0.25s ease;
+    }
+
+    /* Timeline Nodes for Case Study */
+    .timeline-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 780px) {
+      .timeline-steps { grid-template-columns: 1fr; }
+    }
+    .tl-node {
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tl-node:hover {
+      border-color: var(--primary);
+      background: var(--surface);
+    }
+    .tl-node.active {
+      border-color: var(--primary);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+    .tl-step-idx {
+      font-family: var(--font-mono);
+      font-size: 0.73rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tl-step-title {
+      font-weight: 700;
+      font-size: 0.94rem;
+      margin-top: 4px;
+      color: var(--fg);
+    }
+
+    /* Data Tables */
+    .res-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .res-tab {
+      padding: 9px 16px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--fg-secondary);
+      font-weight: 600;
+      font-size: 0.84rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .res-tab:hover { border-color: var(--border-strong); color: var(--fg); }
+    .res-tab.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .res-panel { display: none; }
+    .res-panel.active { display: block; }
+
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: right;
+    }
+    .data-table th, .data-table td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .data-table th:first-child, .data-table td:first-child {
+      text-align: left;
+    }
+    .data-table thead th {
+      background: var(--bg-subtle);
+      color: var(--fg-secondary);
+      font-weight: 700;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .data-table tr.row-group td {
+      background: var(--bg-subtle);
+      font-weight: 700;
+      color: var(--fg);
+      font-size: 0.8rem;
+      text-align: left;
+    }
+    .data-table tr.row-highlight {
+      background: var(--primary-soft);
+    }
+    .data-table tr.row-highlight-ext {
+      background: var(--ext-bg);
+    }
+    .num-best {
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .num-second {
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .num-neg {
+      color: var(--danger-fg);
+      font-weight: 600;
+    }
+    .num-pos {
+      color: var(--ok-fg);
+      font-weight: 700;
+    }
+
+    /* Bar Chart Comparisons */
+    .bar-row {
+      margin-bottom: 11px;
+    }
+    .bar-row-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.81rem;
+      margin-bottom: 4px;
+    }
+    .bar-track {
+      height: 11px;
+      background: var(--bg-subtle);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+
+    footer {
+      padding: 38px 0 54px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Sticky Navigation -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="brand">
+        <span class="brand-badge">AIR-OPD</span>
+        <span class="lang-en">Adaptive Iterative Repair · OPD</span>
+        <span class="lang-zh">自适应迭代修复 · 在策略蒸馏</span>
+      </a>
+      <nav class="nav-links" aria-label="Section navigation">
+        <a href="#motivation"><span class="lang-en">01 · Motivation</span><span class="lang-zh">01 · 研究动机</span></a>
+        <a href="#framework"><span class="lang-en">02 · Framework</span><span class="lang-zh">02 · 方法框架</span></a>
+        <a href="#sandbox"><span class="lang-en">03 · Span Sandbox</span><span class="lang-zh">03 · 纠错区间沙盒</span></a>
+        <a href="#case-study"><span class="lang-en">04 · Evolving Errors</span><span class="lang-zh">04 · 真实轨迹回放</span></a>
+        <a href="#weighting"><span class="lang-en">05 · Stage Weighting</span><span class="lang-zh">05 · 阶段加权与提示词</span></a>
+        <a href="#results"><span class="lang-en">06 · Results (RQ1–RQ4)</span><span class="lang-zh">06 · 实验结果 (RQ1–RQ4)</span></a>
+        <a href="#citation"><span class="lang-en">07 · BibTeX</span><span class="lang-zh">07 · 引用</span></a>
+      </nav>
+      <div class="nav-actions">
+        <button class="icon-btn" id="langToggleBtn" title="Switch Language (English / 中文)">
+          <span>🌐</span>
+          <span id="langToggleLabel">中文</span>
+        </button>
+        <button class="icon-btn" id="themeToggleBtn" title="Toggle Light/Dark Theme">
+          <span id="themeIcon">🌙</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-eyebrow">
+        <span>arXiv 2610.02700</span>
+        <span>·</span>
+        <span class="lang-en">On-Policy Self-Distillation &amp; Reasoning Post-Training</span>
+        <span class="lang-zh">在策略自蒸馏 (OPSD) 与推理后训练</span>
+      </div>
+
+      <h1 class="hero-title">
+        <span class="lang-en">Learning from Evolving Errors: <span class="gradient-text">Adaptive Iterative Repair</span> for On-Policy Distillation</span>
+        <span class="lang-zh">从动态演化的错误中学习：面向在策略蒸馏的<span class="gradient-text">自适应迭代修复框架 (AIR-OPD)</span></span>
+      </h1>
+
+      <p class="hero-subtitle">
+        <span class="lang-en">
+          Reference-conditioned On-Policy Self-Distillation (OPSD) conditions the teacher on a static full reference solution $z$ and supervises every token of a failed attempt—specifying the <em>destination</em>, but not <em>how to transition from the student's current error toward a valid repair</em>. We introduce <strong>AIR-OPD</strong>, which synthesizes error-anchored repair guidance across up to $K$ adaptive retry rounds, supervises only the <strong>error-aligned repair region $R_t$</strong> where the guided teacher expresses positive corrective mass, and combines rounds via <strong>outcome-aware stage weighting</strong>.
+        </span>
+        <span class="lang-zh">
+          传统的参考解条件化在策略自蒸馏（OPSD）将完整静态参考解 $z$ 输入给教师并对失败轨迹的每个 Token 进行全量监督——它只告诉模型“<strong>最终答案在哪</strong>”，却没有教会学生“<strong>如何从当前错误状态过渡到正确推理路径</strong>”（即<em>参考解条件化捷径风险</em>）。我们提出 <strong>AIR-OPD</strong>：针对学生最新暴露的错误锚点动态合成无答案修复指导（最多 $K$ 轮重试），仅在教师提供正向纠错概率质量的<strong>错误对齐修复区间 $R_t$</strong> 上执行蒸馏，并通过<strong>结果感知阶段加权</strong>融合多轮监督。
+        </span>
+      </p>
+
+      <div class="author-block">
+        <span class="pill pill-self">Backbones: Qwen3-4B &amp; Qwen3-8B</span>
+        <span class="pill pill-ext">Guidance: Self-Guidance (0 Extra Models) &amp; External-Guidance (Qwen3.5-27B)</span>
+        <span class="pill pill-ok">Corpus: DAPO-Math-17K (15,650 Verified)</span>
+        <span class="pill pill-neutral">Eval: AIME24 · AIME25 · HMMT25 · MMLU-Pro · GPQA Diamond</span>
+      </div>
+
+      <div class="cta-row">
+        <a href="https://arxiv.org/abs/2610.02700" target="_blank" rel="noopener" class="btn btn-primary">
+          <span>📄</span>
+          <span class="lang-en">Paper (arXiv)</span>
+          <span class="lang-zh">论文 (arXiv)</span>
+        </a>
+        <a href="https://arxiv.org/pdf/2610.02700" target="_blank" rel="noopener" class="btn">
+          <span>📑</span>
+          <span>PDF</span>
+        </a>
+        <span class="btn btn-disabled" title="Code will be released after review">
+          <span>💻</span>
+          <span class="lang-en">Code</span>
+          <span class="lang-zh">代码</span>
+          <span class="btn-badge">IN REVIEW</span>
+        </span>
+        <a href="#case-study" class="btn">
+          <span>🔍</span>
+          <span class="lang-en">Interactive 3-Round Repair Case</span>
+          <span class="lang-zh">交互式三轮错题修复回放</span>
+        </a>
+        <a href="#sandbox" class="btn">
+          <span>🎛️</span>
+          <span class="lang-en">Corrective Mass Span Sandbox</span>
+          <span class="lang-zh">纠错概率质量区间沙盒</span>
+        </a>
+        <a href="#results" class="btn">
+          <span>📊</span>
+          <span class="lang-en">Main Results &amp; Dynamics</span>
+          <span class="lang-zh">主实验与训练动力学</span>
+        </a>
+      </div>
+
+      <div class="tldr-box">
+        <span class="lang-en">
+          <strong>TL;DR:</strong> Supervising failed rollouts with a static reference solution is a blunt instrument—actually, applying standard OPSD only to failed rollouts <em>hurts</em> performance ($63.1\% \to 62.5\%$). <strong>What matters is how each failure is supervised:</strong> conditioning the teacher on targeted repair guidance $g_t$, restricting KL distillation to the error-aligned span $R_t = y_t[b_t:e_t]$, and rewarding rounds whose immediate retry passes verification boosts Qwen3-4B to <strong>65.8% (Self-G) / 66.7% (External-G)</strong>—beating <strong>Qwen3-8B GRPO (64.0%) and 8B OPSD (64.7%)</strong> while preserving OOD generalization.
+        </span>
+        <span class="lang-zh">
+          <strong>核心结论 (TL;DR)：</strong>仅筛选失败轨迹用静态参考解做全序列蒸馏并不能带来收益（将标准 OPSD 限制在失败样本上反而从 $63.1\%$ 跌至 $62.5\%$）。<strong>真正决定上限的是“如何监督每一次失败”：</strong>用针对当前错误的修复指导 $g_t$ 替代完整参考解作为教师特权上下文、将 KL 蒸馏严格限制在错误对齐区间 $R_t = y_t[b_t:e_t]$、并对重试通过验证的阶段赋予结果奖励，使 <strong>Qwen3-4B 达到 65.8% (自指导) / 66.7% (外部指导)</strong>——<strong>以 4B 参数量全面超越 Qwen3-8B 的 GRPO (64.0%) 与 OPSD (64.7%)</strong>，同时几乎零损伤保留分布外 (OOD) 通用能力。
+        </span>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-tag"><span class="lang-en">Math Reasoning (Avg@12)</span><span class="lang-zh">数学竞赛推理提升 (Avg@12)</span></div>
+          <div class="kpi-val">+3.6 pts</div>
+          <div class="kpi-desc">
+            <span class="lang-en">Up to <strong>+3.6 pts</strong> over OPSD (+5.5 over Base). 4B AIR-OPD (<strong>66.7%</strong>) beats 8B OPSD (64.7%) &amp; 8B GRPO (64.0%).</span>
+            <span class="lang-zh">较最强基线 OPSD 提升最高 <strong>+3.6 个百分点</strong>；4B 模型 (66.7%) 跨尺度击败 8B OPSD (64.7%) 与 8B GRPO (64.0%)。</span>
+          </div>
+        </div>
+        <div class="kpi-card kpi-ok">
+          <div class="kpi-tag"><span class="lang-en">OOD Retention (MMLU-Pro + GPQA)</span><span class="lang-zh">分布外泛化保持 (MMLU-Pro + GPQA)</span></div>
+          <div class="kpi-val">61.1% <span style="font-size:0.95rem;color:var(--ok-fg);"> (+0.1)</span></div>
+          <div class="kpi-desc">
+            <span class="lang-en">Preserves Base OOD within <strong>0.1–0.4 pts</strong> (and improves MMLU-Pro), while SFT drops <strong>9.6–9.8 pts</strong> and OPSD drops <strong>1.4–1.9 pts</strong>.</span>
+            <span class="lang-zh">与基座模型 OOD 均值差距在 <strong>0.1–0.4 分以内</strong>（MMLU-Pro 甚至正增长），而 SFT 下降 9.6–9.8 分、OPSD 下降 1.4–1.9 分。</span>
+          </div>
+        </div>
+        <div class="kpi-card kpi-ext">
+          <div class="kpi-tag"><span class="lang-en">Sample &amp; Step Efficiency</span><span class="lang-zh">收敛速度与监督样本效率</span></div>
+          <div class="kpi-val">Step 40 ≈ OPSD@100</div>
+          <div class="kpi-desc">
+            <span class="lang-en">Matches 100-step OPSD by <strong>Step 40</strong> while supervising only <strong>~1/3 as many stages</strong> on localized error spans.</span>
+            <span class="lang-zh">仅需 <strong>40 步</strong>即达到或超越 OPSD 训满 100 步的精度，且监督的阶段数仅为 OPSD 的<strong>约三分之一</strong>。</span>
+          </div>
+        </div>
+        <div class="kpi-card kpi-warn">
+          <div class="kpi-tag"><span class="lang-en">Zero-External-Model Self-Guidance</span><span class="lang-zh">无需外部大模型的自指导模式</span></div>
+          <div class="kpi-val">65.8% / 66.9%</div>
+          <div class="kpi-desc">
+            <span class="lang-en"><code>AIR-OPD (Self-G)</code> uses the student policy itself to diagnose &amp; guide repairs, already gaining <strong>+2.7 / +2.2 pts</strong> over OPSD (4B / 8B) without any external model.</span>
+            <span class="lang-zh"><code>Self-G</code> 直接用学生自身策略生成修复指导，无需任何外部教师即可取得 <strong>+2.7 / +2.2 分</strong> 的显著跃升。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 01: Motivation & Teaser Comparison -->
+  <section id="motivation">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-eyebrow">01 · Problem Formulation &amp; Motivation</div>
+        <h2 class="section-title">
+          <span class="lang-en">Why Static Reference Conditioning Fails on Evolving Student Errors</span>
+          <span class="lang-zh">核心洞察：为什么静态参考解条件化存在“捷径风险”？</span>
+        </h2>
+        <p class="section-desc">
+          <span class="lang-en">
+            In post-training for reasoning, <strong>RLVR (e.g., GRPO)</strong> gives only a single scalar outcome reward per trajectory, while <strong>OPSD</strong> conditions a frozen teacher on the complete reference solution $z$ and forces the student to match the teacher on <em>every token</em> of its rollout. Neither teaches the student how to diagnose and repair its own evolving mistakes.
+          </span>
+          <span class="lang-zh">
+            在推理后训练中，<strong>可验证奖励强化学习 (RLVR/GRPO)</strong> 对整条轨迹仅提供一个标量结果信号；而<strong>在策略自蒸馏 (OPSD)</strong> 将完整参考解 $z$ 塞给教师，并强迫学生在自身生成轨迹的<strong>每一个 Token</strong> 上逼近教师分布。这两者都未能显式教会学生如何从当前局部错误状态过渡到正确推理路径。
+          </span>
+        </p>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">1. RLVR / GRPO</h3>
+            <span class="pill pill-neutral">Outcome Scalar Only</span>
+          </div>
+          <p style="font-size:0.85rem;color:var(--fg-secondary);margin:0 0 10px;">
+            <span class="lang-en">Samples $G=8$ rollouts per prompt and assigns a uniform trajectory-level advantage based on final answer verification $V(y) \in \{0,1\}$.</span>
+            <span class="lang-zh">每个问题采样 $G=8$ 条轨迹，仅根据最终答案是否正确赋予整条序列统一的标量优势（Outcome Reward）。</span>
+          </p>
+          <div class="code-box" style="font-size:0.76rem;">❌ Cannot distinguish the exact step where arithmetic or casework went wrong from valid prefix steps.</div>
+        </div>
+
+        <div class="card" style="border-color:var(--danger-border);">
+          <div class="card-header">
+            <h3 class="card-title">2. Standard OPSD</h3>
+            <span class="pill pill-danger">Shortcut Risk</span>
+          </div>
+          <p style="font-size:0.85rem;color:var(--fg-secondary);margin:0 0 10px;">
+            <span class="lang-en">Teacher observes static full solution $z$ and supervises all $|y|$ tokens of every rollout—even when $y$ is already correct or diverges along a different valid approach.</span>
+            <span class="lang-zh">教师读取完整静态参考解 $z$，对学生轨迹的全部 $|y|$ 个 Token 计算 KL 散度——无论该轨迹原本已做对，还是采用了不同于参考解的思路。</span>
+          </p>
+          <div class="code-box" style="font-size:0.76rem;">⚠️ <strong>Solution-Conditioned Shortcut Risk:</strong> Imitating $p_{\mathrm{T}}(\cdot\mid q,z,y_{&lt;j})$ across all tokens causes OOD forgetting (-1.9 pts) and dilutes corrective signals.</div>
+        </div>
+
+        <div class="card" style="border-color:var(--ok-border);background:var(--ok-bg);">
+          <div class="card-header">
+            <h3 class="card-title">3. AIR-OPD (Ours)</h3>
+            <span class="pill pill-ok">Error-to-Repair Transitions</span>
+          </div>
+          <p style="font-size:0.85rem;color:var(--fg-secondary);margin:0 0 10px;">
+            <span class="lang-en">Leaves already-correct rollouts untouched! On failed rollouts, synthesizes targeted repair guidance $g_t$ for the earliest flaw $a_t$ and supervises only the corrective span $R_t = y_t[b_t:e_t]$.</span>
+            <span class="lang-zh">对已做对的轨迹零干预！仅针对失败轨迹定位首个致错锚点 $a_t$ 并合成无答案指导 $g_t$，仅在纠错区间 $R_t = y_t[b_t:e_t]$ 上执行特权蒸馏。</span>
+          </p>
+          <div class="code-box" style="font-size:0.76rem;background:var(--surface);">✅ If retry $y_1$ exposes a new downstream error, Round 2 adapts $g_1$ to the newly exposed bottleneck!</div>
+        </div>
+      </div>
+
+      <div class="figure-frame">
+        <div class="figure-img-wrap">
+          <img src="figures/intro/teaser.svg" alt="Figure 1: OPSD vs AIR-OPD on a failed mathematical reasoning attempt">
+        </div>
+        <div class="figure-caption">
+          <span class="lang-en">
+            <strong>Figure 1 · Supervising the same failed attempt on a competition math problem.</strong>
+            <strong>(a) Standard OPSD</strong> conditions the teacher on the full reference solution $z$ and supervises every token of the failed attempt.
+            <strong>(b) AIR-OPD</strong> conditions the teacher on targeted repair guidance $g_t$ for the current error (Round 0 fixes the multiplication slip $190\times 153 = 29170 \to 29070$) and supervises only that region. When the student's retry exposes a second hidden error (omitting Case 3: one red and one blue candy), Round 1 synthesizes fresh guidance $g_1$ targeting that case until the retry is verified correct ($\boxed{441}$).
+          </span>
+          <span class="lang-zh">
+            <strong>图 1 · 对同一道数学竞赛失败轨迹的监督方式对比。</strong>
+            <strong>(a) 标准 OPSD</strong> 将完整参考解 $z$ 作为教师条件，对失败回复的每一个 Token 施加无差别监督。
+            <strong>(b) AIR-OPD</strong> 先针对当前错误生成修复指导 $g_0$（第 0 轮修复乘法笔误 $190\times 153 = 29170 \to 29070$）并仅监督该局部区间；当学生的在策略重试暴露出第二个隐藏错误（漏算“一红一蓝”第三种情况）时，第 1 轮动态生成新指导 $g_1$ 靶向该遗漏情况，直至重试通过验证（$\boxed{441}$）。
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 02: Three-Pillar Architecture -->
+  <section id="framework">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-eyebrow">02 · Method Architecture</div>
+        <h2 class="section-title">
+          <span class="lang-en">How AIR-OPD Works: Three Synergistic Pillars</span>
+          <span class="lang-zh">AIR-OPD 方法架构：三大核心支柱</span>
+        </h2>
+        <p class="section-desc">
+          <span class="lang-en">
+            AIR-OPD makes explicit the error-extraction step that OPSD leaves implicit inside the teacher. Only the guidance generator $\mathcal{G}$ reads the reference solution $z$; both the frozen teacher $p_{\mathrm{T}}$ and the retrying student receive only the concise, answer-free repair guidance $g_t$.
+          </span>
+          <span class="lang-zh">
+            AIR-OPD 将 OPSD 隐含在教师内部的“错误诊断与信息提取”显式拆解出来：只有指导生成器 $\mathcal{G}$ 能看到参考解 $z$，而冻结教师 $p_{\mathrm{T}}$ 和重试学生都只接收紧凑且不含最终答案的修复指导 $g_t$。
+          </span>
+        </p>
+      </div>
+
+      <div class="figure-frame" style="margin-top:0;margin-bottom:24px;">
+        <div class="figure-img-wrap">
+          <img src="figures/framework.svg" alt="Figure 2: Overview of AIR-OPD Framework">
+        </div>
+        <div class="figure-caption">
+          <span class="lang-en">
+            <strong>Figure 2 · Overview of the AIR-OPD training pipeline.</strong> When an on-policy rollout $y_t \sim p_\theta(\cdot\mid\mathcal{H}_t)$ fails verification ($V(y_t)=0$), the guidance generator $\mathcal{G}$ quotes the first flawed step verbatim as an error anchor $a_t$ and synthesizes answer-free repair guidance $g_t$. A frozen teacher conditioned on $g_t$ supervises the student over the error-aligned repair region $R_t = y_t[b_t:e_t]$, and the student retries with $g_t$ in context. Outcome-aware stage weighting combines stage losses via $w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$.
+          </span>
+          <span class="lang-zh">
+            <strong>图 2 · AIR-OPD 训练流程总览。</strong>当学生的在策略采样 $y_t \sim p_\theta(\cdot\mid\mathcal{H}_t)$ 未通过验证器 ($V(y_t)=0$) 时，指导生成器 $\mathcal{G}$ 原文摘录首个错误步骤作为锚点 $a_t$ 并合成修复指导 $g_t$。以 $g_t$ 为条件的冻结教师仅在错误对齐修复区间 $R_t = y_t[b_t:e_t]$ 上监督学生，随后学生结合上下文中的 $g_t$ 进行在策略重试。最后通过结果感知阶段权重 $w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$ 聚合各轮损失。
+          </span>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <!-- Pillar 1 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span class="lang-en">§3.1 · Multi-Round Adaptive Repair</span>
+              <span class="lang-zh">§3.1 · 多轮自适应诊断与重试</span>
+            </h3>
+            <span class="pill pill-self">Up to K = 3 Rounds</span>
+          </div>
+          <p style="font-size:0.84rem;color:var(--fg-secondary);margin-top:0;">
+            <span class="lang-en">For failed rollout $y_t$, generator $\mathcal{G}$ diagnoses the earliest causal error against reference $z$:</span>
+            <span class="lang-zh">对验证失败的回复 $y_t$，生成器 $\mathcal{G}$ 比对参考解 $z$ 诊断最早的致错步骤：</span>
+          </p>
+          <div class="formula-box">
+            $$(a_t, g_t) = \mathcal{G}(q, z, \mathcal{H}_t, y_t)$$
+            $$\mathcal{H}_{t+1} = \operatorname{Update}(\mathcal{H}_t, y_t, g_t)$$
+          </div>
+          <ul style="font-size:0.82rem;color:var(--fg-secondary);padding-left:18px;margin-bottom:0;">
+            <li><strong>Verbatim Anchor $a_t$:</strong> Must be an exact contiguous substring in $y_t$ (rule-checked).</li>
+            <li><strong>Answer-Free Guidance $g_t$:</strong> States the governing logic without leaking the final answer.</li>
+            <li><strong>Two Instantiations:</strong> <code>Self-G</code> (student itself) or <code>External-G</code> (Qwen3.5-27B).</li>
+          </ul>
+        </div>
+
+        <!-- Pillar 2 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span class="lang-en">§3.2 · Error-Aligned Span $R_t$</span>
+              <span class="lang-zh">§3.2 · 错误对齐特权蒸馏区间 $R_t$</span>
+            </h3>
+            <span class="pill pill-ok">1 − ε = 90% Mass</span>
+          </div>
+          <p style="font-size:0.84rem;color:var(--fg-secondary);margin-top:0;">
+            <span class="lang-en">Starts at exact match $b_t$ of anchor $a_t$. Measures positive teacher–student corrective mass at token $j$:</span>
+            <span class="lang-zh">起点 $b_t$ 由锚点 $a_t$ 精确匹配定位；终点 $e_t$ 由教师对替代 Token 的正向纠错概率质量决定：</span>
+          </p>
+          <div class="formula-box">
+            $$\begin{aligned}C_{t,j} = \sum_{v\neq y_{t,j}} \big[&amp;p_{\mathrm{T}}(v\mid \mathcal{H}_t,g_t,y_{t,&lt;j}) \\ &amp;- p_\theta(v\mid \mathcal{H}_t,y_{t,&lt;j})\big]_+\end{aligned}$$
+          </div>
+          <div class="formula-box">
+            $$e_t = \min\Bigl\{r\in\mathcal{E}_t : \sum_{j=b_t}^{r-1} C_{t,j} \ge (1-\epsilon)\sum_{j=b_t}^{|y_t|-1} C_{t,j}\Bigr\}$$
+          </div>
+          <p style="font-size:0.81rem;color:var(--muted);margin:0;">
+            <span class="lang-en">Zero extra forward passes: $C_{t,j}$ reuses logits already computed for the KL loss!</span>
+            <span class="lang-zh">零额外算力开销：$C_{t,j}$ 直接复用计算 KL 损失时已有的教师与学生分布！</span>
+          </p>
+        </div>
+
+        <!-- Pillar 3 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span class="lang-en">§3.3 · Outcome-Aware Weighting</span>
+              <span class="lang-zh">§3.3 · 结果感知阶段加权</span>
+            </h3>
+            <span class="pill pill-ext">γ = 0.8 · ρ = 1.5</span>
+          </div>
+          <p style="font-size:0.84rem;color:var(--fg-secondary);margin-top:0;">
+            <span class="lang-en">Normalizes weights across each trajectory's $T_n+1$ stages by depth $t$ and immediate retry verification $s_{n,t} = \mathbb{I}[V(y_{n,t+1})=1]$:</span>
+            <span class="lang-zh">结合阶段深度衰减 $\gamma^t$ 与紧随其后的重试验证奖励 $\rho^{s_{n,t}}$ 对单条轨迹做归一化加权：</span>
+          </p>
+          <div class="formula-box">
+            $$\widetilde{w}_{n,t} = \gamma^t \rho^{s_{n,t}}, \quad w_{n,t} = \frac{\widetilde{w}_{n,t}}{\sum_{k=0}^{T_n}\widetilde{w}_{n,k}}$$
+          </div>
+          <div class="formula-box">
+            $$\mathcal{L}_{\mathrm{AIR\text{-}OPD}} = \frac{1}{|\mathcal{B}|}\sum_{n\in\mathcal{B}}\sum_{t=0}^{T_n} w_{n,t}\,\mathcal{L}_{n,t}$$
+          </div>
+          <p style="font-size:0.81rem;color:var(--muted);margin:0;">
+            <span class="lang-en">Unit total weight per trajectory prevents multi-round failures from dominating gradients.</span>
+            <span class="lang-zh">每条轨迹总权重恒为 1，既防止多轮长轨迹主导梯度，又奖励真正促成修复成功的关键轮次。</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 03: Interactive Supervision Region & Corrective Mass Sandbox -->
+  <section id="sandbox">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-eyebrow">03 · Interactive Error-Alignment Sandbox</div>
+        <h2 class="section-title">
+          <span class="lang-en">How Corrective Probability Mass $C_{t,j}$ Selects the Supervision Region $R_t = y_t[b_t:e_t]$</span>
+          <span class="lang-zh">交互式沙盒：正向纠错概率质量 $C_{t,j}$ 如何确定最优蒸馏区间 $R_t = y_t[b_t:e_t]$</span>
+        </h2>
+        <p class="section-desc">
+          <span class="lang-en">
+            Why not supervise the whole failed response, or only the single paragraph containing the error? Toggle the supervision strategy or adjust the tail tolerance $\epsilon$ below to see how block-level corrective mass $C_{t,j}$ captures both the anchored error and its immediate downstream consequences while filtering out noisy tail tokens.
+          </span>
+          <span class="lang-zh">
+            为什么不能直接监督整条失败回复，或者只监督报错的那一个段落？请切换下方的监督策略或调节尾部容忍度阈值 $\epsilon$，观察各推理块的正向纠错质量 $C_{t,j}$ 如何精准覆盖“致错锚点 + 紧邻的可恢复推导区”，同时过滤掉尾部无关噪声。
+          </span>
+        </p>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-size:0.78rem;font-family:var(--font-mono);color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:6px;">
+              Select Supervision Strategy (Table 2 Ablation Comparison)
+            </div>
+            <div class="btn-group" id="spanModeBtns">
+              <button class="seg-btn active" data-mode="air_default">AIR-OPD Default (ε = 0.10 · 65.8%)</button>
+              <button class="seg-btn" data-mode="error_block">Ablation: Error Block Only (64.2% · −1.6 pts)</button>
+              <button class="seg-btn" data-mode="full_response">Ablation: w/o Error Alignment (64.7% · −1.1 pts)</button>
+              <button class="seg-btn" data-mode="opsd_failed">OPSD Failed-Only w/ Full Ref z (62.5% · −3.3 pts)</button>
+            </div>
+          </div>
+
+          <div style="min-width:250px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:var(--font-mono);font-weight:700;color:var(--fg-secondary);margin-bottom:4px;">
+              <span>Tolerance $\epsilon$ (Tail Discard):</span>
+              <span id="epsValLabel" style="color:var(--primary);">ε = 0.10 (Retains ≥90% Mass)</span>
+            </div>
+            <input type="range" id="epsSlider" min="0.02" max="0.55" step="0.01" value="0.10" style="width:100%;accent-color:var(--primary);cursor:pointer;">
+          </div>
+        </div>
+
+        <p style="font-size:0.78rem;color:var(--muted);margin:0 0 10px;">
+          <span class="lang-en">Note: per-block corrective-mass values in this sandbox are <strong>illustrative</strong> (not measured) and only demonstrate the endpoint rule; the Math Avg. numbers on the buttons are the measured ablation results.</span>
+          <span class="lang-zh">说明：沙盒中各推理块的纠错质量数值为<strong>示意值</strong>（非实测），仅用于演示终点选择规则；按钮上的 Math Avg. 为论文实测消融结果。</span>
+        </p>
+        <div id="sandboxBanner" style="padding:12px 16px;border-radius:8px;font-size:0.85rem;margin-bottom:16px;background:var(--ok-bg);border:1px solid var(--ok-border);color:var(--ok-fg);"></div>
+
+        <div style="font-size:0.78rem;font-family:var(--font-mono);color:var(--muted);font-weight:700;text-transform:uppercase;">
+          Reasoning Blocks in Failed Rollout $y_0$ (Partitioned at Blank-Line Boundaries $\mathcal{E}_t$)
+        </div>
+
+        <div class="mass-bars" id="massBarsContainer"></div>
+
+        <div id="sandboxRolloutPreview" class="code-box" style="margin-top:12px;font-size:0.81rem;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 04: Interactive Multi-Round Evolving Error Case Study -->
+  <section id="case-study">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-eyebrow">04 · Real Training Trajectory Inspector</div>
+        <h2 class="section-title">
+          <span class="lang-en">Step-by-Step Evolving Error Repair (Reconstructed from Qwen3-4B Self-Guidance Logs)</span>
+          <span class="lang-zh">三轮动态错题修复实录（重构自 Qwen3-4B 自指导训练真实日志）</span>
+        </h2>
+        <p class="section-desc">
+          <span class="lang-en">
+            Click through the 3 stages below (Appendix C.1 / Figure 1b) to see why a single static correction is often not enough: fixing an early arithmetic slip in Round 0 unmasks a deeper combinatorics omission in Round 1, which Round 2 then resolves.
+          </span>
+          <span class="lang-zh">
+            点击下方三个阶段（对应论文附录 C.1 与图 1b），直观了解为什么单次静态纠正往往不够：第 0 轮修复分母乘法笔误后，第 1 轮在策略重试暴露出深层的“分类讨论漏算”，随后第 2 轮精准补齐第三类情况并验证通过。
+          </span>
+        </p>
+      </div>
+
+      <div class="explorer-shell">
+        <div class="explorer-body">
+          <div style="padding:12px 16px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);margin-bottom:18px;font-size:0.87rem;">
+            <strong>Competition Problem ($q$):</strong> A jar has $10$ red candies and $10$ blue candies. Terry picks two candies at random, then Mary picks two of the remaining candies at random. Given that the probability that they get the same color combination, irrespective of order, is $m/n$, where $m$ and $n$ are relatively prime positive integers, find $m+n$.
+            <span class="pill pill-ok" style="margin-left:8px;">Ground-Truth Answer: 118/323 → m + n = 441</span>
+          </div>
+
+          <div class="timeline-steps" id="caseTimeline"></div>
+
+          <div id="caseDetailContainer"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 05: Interactive Outcome-Aware Stage Weighting & Prompts -->
+  <section id="weighting">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-eyebrow">05 · Stage Weighting Simulator &amp; Prompt Templates</div>
+        <h2 class="section-title">
+          <span class="lang-en">Outcome-Aware Stage Weighting ($w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$) &amp; Exact Prompts</span>
+          <span class="lang-zh">结果感知阶段加权计算器与特权指导生成提示词</span>
+        </h2>
+        <p class="section-desc">
+          <span class="lang-en">
+            Because a retry can fail even when its guidance successfully repaired the anchored error (as in Round 0 above!), AIR-OPD does not penalize failed retries—instead, it combines a gentle temporal decay $\gamma^t$ with an outcome bonus $\rho^{s_{n,t}}$ for stages whose immediate retry passes verification.
+          </span>
+          <span class="lang-zh">
+            正如上方第 0 轮所示，即使指导成功修复了当前锚点错误，重试仍可能因后续隐患而未通过验证。因此 AIR-OPD 不会惩罚失败重试，而是将深度衰减因子 $\gamma^t$ 与“紧随重试通过验证”的奖励因子 $\rho^{s_{n,t}}$ 相结合。
+          </span>
+        </p>
+      </div>
+
+      <div class="grid-2">
+        <!-- Left: Interactive Weighting Simulator -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Interactive Stage Weighting Simulator</h3>
+            <span class="pill pill-ext">§3.3 Stage Weights</span>
+          </div>
+          <p style="font-size:0.84rem;color:var(--fg-secondary);margin-top:0;">
+            Select a preset from Table 2 or adjust $(\gamma, \rho)$ and retry outcomes $(s_0, s_1, s_2)$ to inspect how unit trajectory weight is distributed across repair stages:
+          </p>
+
+          <div class="btn-group" style="margin-bottom:14px;" id="weightPresetBtns">
+            <button class="seg-btn active" data-g="0.8" data-r="1.5">AIR-OPD Default (0.8, 1.5) · 65.8%</button>
+            <button class="seg-btn" data-g="0.8" data-r="1.0">Temporal Only (0.8, 1.0) · 65.4%</button>
+            <button class="seg-btn" data-g="1.0" data-r="1.5">Outcome Bonus Only (1.0, 1.5) · 65.4%</button>
+            <button class="seg-btn" data-g="1.0" data-r="1.0">Uniform (1.0, 1.0) · 65.0%</button>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div style="background:var(--bg-subtle);padding:10px 12px;border-radius:8px;border:1px solid var(--border);">
+              <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:var(--font-mono);font-weight:700;">
+                <span>Temporal Factor $\gamma$:</span>
+                <span id="gammaVal" style="color:var(--primary);">0.80</span>
+              </div>
+              <input type="range" id="gammaSlider" min="0.50" max="1.00" step="0.05" value="0.80" style="width:100%;margin-top:6px;accent-color:var(--primary);">
+            </div>
+            <div style="background:var(--bg-subtle);padding:10px 12px;border-radius:8px;border:1px solid var(--border);">
+              <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:var(--font-mono);font-weight:700;">
+                <span>Outcome Bonus $\rho$:</span>
+                <span id="rhoVal" style="color:#ea580c;">1.50</span>
+              </div>
+              <input type="range" id="rhoSlider" min="1.00" max="2.50" step="0.05" value="1.50" style="width:100%;margin-top:6px;accent-color:#ea580c;">
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <div style="font-size:0.76rem;font-family:var(--font-mono);color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:6px;">
+              Trajectory Outcome Scenario:
+            </div>
+            <div class="btn-group" id="scenarioBtns">
+              <button class="seg-btn active" data-scen="r2_pass">2-Stage Repair: R1 Fails (s₀=0), R2 Passes (s₁=1)</button>
+              <button class="seg-btn" data-scen="r3_pass">3-Stage Repair: s₀=0, s₁=0, R3 Passes (s₂=1)</button>
+              <button class="seg-btn" data-scen="all_fail">3-Stage Unresolved: s₀=0, s₁=0, s₂=0</button>
+            </div>
+          </div>
+
+          <div id="weightBarsOutput" style="margin-top:14px;"></div>
+        </div>
+
+        <!-- Right: Algorithm 1 & Prompt Templates -->
+        <div class="card" style="display:flex;flex-direction:column;">
+          <div class="card-header">
+            <h3 class="card-title">Algorithm &amp; Verbatim Prompt Templates</h3>
+            <div class="btn-group" id="promptTabs">
+              <button class="seg-btn active" data-pt="alg">Algorithm 1</button>
+              <button class="seg-btn" data-pt="round1">Round 1 Generator</button>
+              <button class="seg-btn" data-pt="round2">Round 2–3 Replacement</button>
+              <button class="seg-btn" data-pt="dialogue">Student Retry Turn</button>
+            </div>
+          </div>
+          <div id="promptBoxContent" class="code-box" style="flex:1;max-height:390px;overflow:auto;font-size:0.77rem;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 06: Empirical Results (RQ1 - RQ4) -->
+  <section id="results">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-eyebrow">06 · Comprehensive Empirical Evaluation (RQ1 – RQ4)</div>
+        <h2 class="section-title">
+          <span class="lang-en">Main Results, Component Ablations, Repair Budget $K$, and Training Dynamics</span>
+          <span class="lang-zh">实验结果全景：主表对比、核心消融、修复预算 $K$ 与训练收敛动力学</span>
+        </h2>
+        <p class="section-desc">
+          <span class="lang-en">
+            Trained for 100 optimizer steps on DAPO-Math-17K (15,650 verified problems) with rank-64 LoRA on 8×H100 GPUs. No repair guidance is used at evaluation time; all methods share identical inference settings (Avg@12 on AIME24/AIME25/HMMT25 at temp 1.0, max 38,912 tokens; Avg@4 on MMLU-Pro &amp; GPQA Diamond).
+          </span>
+          <span class="lang-zh">
+            在 DAPO-Math-17K（15,650 道经验证竞赛题）上使用 rank-64 LoRA 训练 100 步（GRPO 为 500 步×8 rollouts）。评测阶段完全不提供任何修复指导，所有方法采用完全一致的采样配置（数学竞赛汇报 Avg@12，分布外基准汇报 Avg@4）。
+          </span>
+        </p>
+      </div>
+
+      <div class="res-tabs" id="resTabs">
+        <button class="res-tab active" data-panel="panel-rq1">RQ1 · Main Results (4B &amp; 8B + OOD)</button>
+        <button class="res-tab" data-panel="panel-rq2">RQ2 · Sample Selection &amp; Component Ablations</button>
+        <button class="res-tab" data-panel="panel-rq3">RQ3 · Repair Budget Sweep (K = 1..5)</button>
+        <button class="res-tab" data-panel="panel-rq4">RQ4 · Training Dynamics (Steps 20–100)</button>
+      </div>
+
+      <!-- Panel RQ1 -->
+      <div class="res-panel active" id="panel-rq1">
+        <div class="table-wrap" style="margin-bottom:22px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Method / Scale</th>
+                <th>AIME24 (Avg@12)</th>
+                <th>AIME25 (Avg@12)</th>
+                <th>HMMT25 (Avg@12)</th>
+                <th>Math Avg. (%)</th>
+                <th>Δ vs. OPSD</th>
+                <th>MMLU-Pro</th>
+                <th>GPQA Diamond</th>
+                <th>OOD Avg. (%)</th>
+                <th>Δ vs. Base OOD</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="row-group">
+                <td colspan="10">Qwen3-4B Backbone (100 Optimizer Steps; GRPO: 500 Steps × 8 Rollouts)</td>
+              </tr>
+              <tr>
+                <td><strong>Base Model</strong> (Qwen3-4B)</td>
+                <td>75.0</td>
+                <td>66.4</td>
+                <td>42.2</td>
+                <td>61.2</td>
+                <td>-1.9</td>
+                <td>51.5</td>
+                <td class="num-best">62.9</td>
+                <td class="num-best">57.2</td>
+                <td>Ref (0.0)</td>
+              </tr>
+              <tr>
+                <td><strong>SFT</strong> (Offline Reference Imitation)</td>
+                <td>70.6</td>
+                <td>61.4</td>
+                <td>42.8</td>
+                <td class="num-neg">58.2</td>
+                <td class="num-neg">-4.9</td>
+                <td class="num-neg">43.1</td>
+                <td class="num-neg">52.0</td>
+                <td class="num-neg">47.6</td>
+                <td class="num-neg">-9.6 (Severe Forgetting)</td>
+              </tr>
+              <tr>
+                <td><strong>GRPO</strong> (Outcome-Reward RLVR)</td>
+                <td>75.6</td>
+                <td>67.5</td>
+                <td>43.9</td>
+                <td>62.3</td>
+                <td>-0.8</td>
+                <td>51.3</td>
+                <td class="num-second">62.4</td>
+                <td>56.8</td>
+                <td>-0.4</td>
+              </tr>
+              <tr>
+                <td><strong>OPSD</strong> (Full-Response Ref-Conditioned)</td>
+                <td>76.4</td>
+                <td>69.4</td>
+                <td>43.3</td>
+                <td>63.1</td>
+                <td>Ref (0.0)</td>
+                <td>50.4</td>
+                <td>60.2</td>
+                <td class="num-neg">55.3</td>
+                <td class="num-neg">-1.9</td>
+              </tr>
+              <tr class="row-highlight">
+                <td><strong>AIR-OPD (Self-G)</strong> · <em>Student as Generator</em></td>
+                <td class="num-second">76.7</td>
+                <td class="num-second">73.1</td>
+                <td class="num-best">47.8</td>
+                <td class="num-second">65.8</td>
+                <td class="num-pos">+2.7</td>
+                <td class="num-best">52.5</td>
+                <td>61.4</td>
+                <td class="num-second">56.9</td>
+                <td class="num-pos">-0.3 (Preserved)</td>
+              </tr>
+              <tr class="row-highlight-ext">
+                <td><strong>AIR-OPD (External-G)</strong> · <em>Qwen3.5-27B Generator</em></td>
+                <td class="num-best">80.0</td>
+                <td class="num-best">73.3</td>
+                <td class="num-second">46.7</td>
+                <td class="num-best">66.7</td>
+                <td class="num-pos">+3.6</td>
+                <td class="num-second">51.7</td>
+                <td>61.9</td>
+                <td>56.8</td>
+                <td class="num-pos">-0.4 (Preserved)</td>
+              </tr>
+
+              <tr class="row-group">
+                <td colspan="10">Qwen3-8B Backbone (100 Optimizer Steps; GRPO: 500 Steps × 8 Rollouts)</td>
+              </tr>
+              <tr>
+                <td><strong>Base Model</strong> (Qwen3-8B)</td>
+                <td>75.8</td>
+                <td>65.6</td>
+                <td>43.9</td>
+                <td>61.8</td>
+                <td>-2.9</td>
+                <td>57.9</td>
+                <td class="num-second">64.1</td>
+                <td class="num-second">61.0</td>
+                <td>Ref (0.0)</td>
+              </tr>
+              <tr>
+                <td><strong>SFT</strong> (Offline Reference Imitation)</td>
+                <td>75.3</td>
+                <td>63.6</td>
+                <td>43.6</td>
+                <td class="num-neg">60.8</td>
+                <td class="num-neg">-3.9</td>
+                <td class="num-neg">46.5</td>
+                <td class="num-neg">55.8</td>
+                <td class="num-neg">51.2</td>
+                <td class="num-neg">-9.8 (Severe Forgetting)</td>
+              </tr>
+              <tr>
+                <td><strong>GRPO</strong> (Outcome-Reward RLVR)</td>
+                <td>76.9</td>
+                <td>69.2</td>
+                <td>45.8</td>
+                <td>64.0</td>
+                <td>-0.7</td>
+                <td>56.6</td>
+                <td class="num-best">64.5</td>
+                <td>60.6</td>
+                <td>-0.4</td>
+              </tr>
+              <tr>
+                <td><strong>OPSD</strong> (Full-Response Ref-Conditioned)</td>
+                <td>77.8</td>
+                <td>69.7</td>
+                <td>46.7</td>
+                <td>64.7</td>
+                <td>Ref (0.0)</td>
+                <td>57.4</td>
+                <td>61.7</td>
+                <td class="num-neg">59.6</td>
+                <td class="num-neg">-1.4</td>
+              </tr>
+              <tr class="row-highlight">
+                <td><strong>AIR-OPD (Self-G)</strong> · <em>Student as Generator</em></td>
+                <td class="num-second">78.3</td>
+                <td class="num-second">72.5</td>
+                <td class="num-best">49.7</td>
+                <td class="num-second">66.9</td>
+                <td class="num-pos">+2.2</td>
+                <td class="num-best">58.3</td>
+                <td>63.5</td>
+                <td>60.9</td>
+                <td class="num-pos">-0.1 (Preserved)</td>
+              </tr>
+              <tr class="row-highlight-ext">
+                <td><strong>AIR-OPD (External-G)</strong> · <em>Qwen3.5-27B Generator</em></td>
+                <td class="num-best">79.7</td>
+                <td class="num-best">73.1</td>
+                <td class="num-second">49.4</td>
+                <td class="num-best">67.4</td>
+                <td class="num-pos">+2.7</td>
+                <td class="num-second">58.0</td>
+                <td class="num-second">64.1</td>
+                <td class="num-best">61.1</td>
+                <td class="num-pos">+0.1 (Zero Loss!)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Cross-Scale Takeaway: 4B AIR-OPD Beats 8B Baselines</h3>
+              <span class="pill pill-ok">2× Parameter Efficiency</span>
+            </div>
+            <p style="font-size:0.84rem;color:var(--fg-secondary);margin-top:0;">
+              Compare Math Avg. across model scales: Qwen3-4B trained with AIR-OPD surpasses every Qwen3-8B baseline!
+            </p>
+            <div class="bar-row">
+              <div class="bar-row-top"><span><strong>Qwen3-8B + AIR-OPD (External-G)</strong></span><span class="num-best">67.4%</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width:94%;background:#ea580c;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-row-top"><span><strong>Qwen3-8B + AIR-OPD (Self-G)</strong></span><span class="num-best">66.9%</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width:91%;background:#2563eb;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-row-top"><span><strong>Qwen3-4B + AIR-OPD (External-G)</strong> <span class="pill pill-ext" style="font-size:0.65rem;padding:1px 6px;">4B Beats 8B OPSD!</span></span><span class="num-best">66.7%</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width:89%;background:#f97316;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-row-top"><span><strong>Qwen3-4B + AIR-OPD (Self-G)</strong> <span class="pill pill-self" style="font-size:0.65rem;padding:1px 6px;">4B Beats 8B OPSD!</span></span><span class="num-best">65.8%</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width:84%;background:#3b82f6;"></div></div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-row-top"><span>Qwen3-8B + OPSD (Full-Response Baseline)</span><span>64.7%</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width:76%;background:#64748b;"></div></div>
+            </div>
+            <div class="bar-row" style="margin-bottom:0;">
+              <div class="bar-row-top"><span>Qwen3-8B + GRPO (500 Steps × 8 Rollouts)</span><span>64.0%</span></div>
+              <div class="bar-track"><div class="bar-fill" style="width:71%;background:#94a3b8;"></div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Why OOD Generalization Is Preserved</h3>
+              <span class="pill pill-self">Localized Updates</span>
+            </div>
+            <p style="font-size:0.84rem;color:var(--fg-secondary);margin-top:0;">
+              Why does SFT lose 9.6–9.8 OOD points and OPSD lose 1.4–1.9 points, while AIR-OPD keeps OOD within 0.1–0.4 points of the base model and even improves MMLU-Pro (<code>51.5 → 52.5</code> at 4B, <code>57.9 → 58.3</code> at 8B)?
+            </p>
+            <ul style="font-size:0.83rem;color:var(--fg-secondary);padding-left:18px;margin-bottom:0;">
+              <li style="margin-bottom:8px;"><strong>Zero Unnecessary Perturbation on Correct Rollouts:</strong> When the student already solves a problem ($V(y_0)=1$), AIR-OPD applies zero gradient updates rather than forcing imitation of a different reference solution $z$.</li>
+              <li style="margin-bottom:8px;"><strong>Span-Restricted KL Supervision:</strong> Even on failed rollouts, KL divergence is restricted to $R_t = y_t[b_t:e_t]$, leaving valid prefix reasoning and stylistic tokens untouched.</li>
+              <li><strong>Largest Gains on the Hardest Benchmarks:</strong> Gains over OPSD are largest on AIME25 (<strong>+2.8 to +3.9 pts</strong>) and HMMT25 (<strong>+2.7 to +4.5 pts</strong>), the harder benchmarks where failed rollouts are more frequent; on AIME24 the Self-G gain is at most +0.5.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel RQ2 -->
+      <div class="res-panel" id="panel-rq2">
+        <div class="grid-2">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Ablation Setting (Qwen3-4B, Self-G)</th>
+                  <th>Math Avg. (%)</th>
+                  <th>Δ vs. AIR-OPD</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="row-highlight">
+                  <td><strong>AIR-OPD (Full Default: Error-Aligned R_t + γ=0.8, ρ=1.5)</strong></td>
+                  <td class="num-best">65.8</td>
+                  <td>—</td>
+                </tr>
+                <tr class="row-group"><td colspan="3">1. Does simply filtering for failed rollouts explain the gain?</td></tr>
+                <tr>
+                  <td>Standard OPSD (All rollouts, full reference $z$)</td>
+                  <td>63.1</td>
+                  <td class="num-neg">-2.7</td>
+                </tr>
+                <tr>
+                  <td>Failure-Only OPSD (Failed rollouts only, full reference $z$)</td>
+                  <td class="num-neg">62.5</td>
+                  <td class="num-neg">-3.3 (Worse than standard OPSD!)</td>
+                </tr>
+                <tr class="row-group"><td colspan="3">2. Supervision Region $R_t = y_t[b_t:e_t]$ Ablations</td></tr>
+                <tr>
+                  <td>w/o Error Alignment (Supervise full failed response under $g_t$)</td>
+                  <td>64.7</td>
+                  <td class="num-neg">-1.1</td>
+                </tr>
+                <tr>
+                  <td>Error Block Only (Stop at first blank-line boundary after $b_t$)</td>
+                  <td>64.2</td>
+                  <td class="num-neg">-1.6</td>
+                </tr>
+                <tr class="row-group"><td colspan="3">3. Outcome-Aware Stage Weighting $(\gamma, \rho)$ Ablations</td></tr>
+                <tr>
+                  <td>Uniform Weighting $(\gamma=1.0, \rho=1.0)$</td>
+                  <td>65.0</td>
+                  <td class="num-neg">-0.8</td>
+                </tr>
+                <tr>
+                  <td>Temporal Factor Only $(\gamma=0.8, \rho=1.0)$</td>
+                  <td>65.4</td>
+                  <td class="num-neg">-0.4</td>
+                </tr>
+                <tr>
+                  <td>Outcome Bonus Only $(\gamma=1.0, \rho=1.5)$</td>
+                  <td>65.4</td>
+                  <td class="num-neg">-0.4</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom:12px;">Key Diagnostic Insights from Table 2</h3>
+            <div style="padding:12px 14px;border-radius:8px;background:var(--danger-bg);border:1px solid var(--danger-border);margin-bottom:12px;font-size:0.84rem;">
+              <strong style="color:var(--danger-fg);">Crucial Finding 1 · Sample Selection Alone Hurts (62.5% vs. 63.1%):</strong>
+              <div style="color:var(--fg-secondary);margin-top:4px;">
+                Restricting standard OPSD to failed rollouts actually <em>lowers</em> accuracy by 0.6 points (<code>62.5%</code>), trailing AIR-OPD by <strong>3.3 points</strong>. Thus, AIR-OPD's gains come from <strong>how it supervises each failure</strong> (error-specific guidance $g_t$ + span alignment $R_t$), not from skipping correct rollouts.
+              </div>
+            </div>
+            <div style="padding:12px 14px;border-radius:8px;background:var(--self-bg);border:1px solid var(--self-border);margin-bottom:12px;font-size:0.84rem;">
+              <strong style="color:var(--self-fg);">Crucial Finding 2 · Both Too Wide and Too Narrow Hurt (−1.1 / −1.6 pts):</strong>
+              <div style="color:var(--fg-secondary);margin-top:4px;">
+                Supervising the entire response (<code>64.7%</code>) dilutes the gradient with prefix/tail tokens unrelated to $g_t$, while stopping at the first error block (<code>64.2%</code>) misses downstream steps where the teacher still expresses corrective mass $C_{t,j}$.
+              </div>
+            </div>
+            <div style="padding:12px 14px;border-radius:8px;background:var(--ok-bg);border:1px solid var(--ok-border);font-size:0.84rem;">
+              <strong style="color:var(--ok-fg);">Crucial Finding 3 · Temporal Decay &amp; Outcome Bonus Are Complementary:</strong>
+              <div style="color:var(--fg-secondary);margin-top:4px;">
+                Adding either $\gamma=0.8$ or $\rho=1.5$ alone lifts uniform weighting from <code>65.0%</code> to <code>65.4%</code>, and combining both reaches <code>65.8%</code>.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel RQ3 -->
+      <div class="res-panel" id="panel-rq3">
+        <div class="grid-2" style="align-items:start;">
+          <div class="figure-frame" style="margin-top:0;">
+            <div class="figure-img-wrap">
+              <img src="figures/figure3_repair_budget.svg" alt="Figure 3: Effect of Repair Budget K" style="max-height:340px;">
+            </div>
+            <div class="figure-caption">
+              <strong>Figure 3 · Effect of the maximum repair budget $K \in \{1,2,3,4,5\}$ on Qwen3-4B.</strong> Solid curves (left axis) show Math Avg. (%); dashed curves (right axis) show total supervised stages as a percentage of the 3,200 trajectories supervised by standard OPSD.
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Repair Budget Sweep Breakdown ($K = 1 \dots 5$)</h3>
+              <span class="pill pill-ok">Default K = 3</span>
+            </div>
+            <div class="table-wrap" style="margin-bottom:14px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Budget $K$</th>
+                    <th>Self-G Math Avg.</th>
+                    <th>External-G Math Avg.</th>
+                    <th>Self-G Stages (% OPSD)</th>
+                    <th>Ext-G Stages (% OPSD)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>K = 1</strong> (Single Round)</td>
+                    <td>63.6% (+1.1 vs Fail-OPSD)</td>
+                    <td>64.0% (+1.5 vs Fail-OPSD)</td>
+                    <td>711 (22.2%)</td>
+                    <td>711 (22.2%)</td>
+                  </tr>
+                  <tr>
+                    <td><strong>K = 2</strong></td>
+                    <td>64.7%</td>
+                    <td>65.3%</td>
+                    <td>976 (30.5%)</td>
+                    <td>949 (29.7%)</td>
+                  </tr>
+                  <tr class="row-highlight">
+                    <td><strong>K = 3 (Default)</strong></td>
+                    <td class="num-best">65.8%</td>
+                    <td class="num-best">66.7%</td>
+                    <td><strong>1,097 (34.3%)</strong></td>
+                    <td><strong>1,051 (32.8%)</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>K = 4</strong></td>
+                    <td>65.9% (+0.1)</td>
+                    <td>67.0% (+0.3)</td>
+                    <td>1,161 (36.3%)</td>
+                    <td>1,100 (34.4%)</td>
+                  </tr>
+                  <tr>
+                    <td><strong>K = 5</strong></td>
+                    <td>65.5% (-0.4 vs K=4)</td>
+                    <td>66.8% (-0.2 vs K=4)</td>
+                    <td>1,198 (37.4%)</td>
+                    <td>1,126 (35.2%)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p style="font-size:0.78rem;color:var(--warn-fg);background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:6px;padding:6px 10px;margin:0 0 10px;">
+              ⚠️ Supervised-stage counts: Self-G K = 1–3 are measured; K = 4–5 and all External-G counts are extrapolated estimates (as in the paper's figure data). Math Avg. values are as reported.
+            </p>
+            <ul style="font-size:0.83rem;color:var(--fg-secondary);padding-left:18px;margin:0;">
+              <li style="margin-bottom:6px;"><strong>Even $K=1$ beats OPSD (<code>63.6% / 64.0%</code> vs <code>63.1%</code>):</strong> At $K=1$ every trajectory has at most 1 stage, proving that error-aligned guidance $g_0$ is intrinsically more informative than full reference $z$.</li>
+              <li style="margin-bottom:6px;"><strong>Multi-round repair ($K=1 \to 3$) adds +2.2 to +2.7 pts:</strong> Confirms that adapting guidance to newly exposed errors unlocks substantial gains while still using only <strong>~33–34%</strong> of OPSD's supervision stages.</li>
+              <li><strong>External-G requires fewer extra stages than Self-G:</strong> Stronger external guidance resolves more errors in Round 1, leaving fewer unresolved trajectories for Rounds 2–5.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel RQ4 -->
+      <div class="res-panel" id="panel-rq4">
+        <div class="figure-frame" style="margin-top:0;margin-bottom:20px;">
+          <div class="figure-img-wrap">
+            <img src="figures/figure4_training_dynamics.svg" alt="Figure 4: Training Dynamics on Qwen3-4B across Checkpoints">
+          </div>
+          <div class="figure-caption">
+            <strong>Figure 4 · Training dynamics across checkpoints saved every 20 optimizer steps (Qwen3-4B).</strong> Both AIR-OPD variants lead OPSD and GRPO on the three-benchmark average from Step 20 onward, and reach OPSD's final 100-step accuracy (<code>63.1%</code>) by <strong>Step 40</strong> (<code>63.1%</code> Self-G, <code>65.5%</code> External-G).
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Benchmark / Method</th>
+                <th>Base (Step 0)</th>
+                <th>Step 20</th>
+                <th>Step 40</th>
+                <th>Step 60</th>
+                <th>Step 80</th>
+                <th>Step 100</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="row-group"><td colspan="7">Three-Benchmark Math Avg. (%) — Qwen3-4B</td></tr>
+              <tr class="row-highlight-ext">
+                <td><strong>AIR-OPD (External-G)</strong></td>
+                <td>61.2</td>
+                <td class="num-best">62.2</td>
+                <td class="num-best">65.5 (Beats 100-step OPSD!)</td>
+                <td class="num-best">66.7</td>
+                <td class="num-best">65.8</td>
+                <td class="num-best">66.1</td>
+              </tr>
+              <tr class="row-highlight">
+                <td><strong>AIR-OPD (Self-G)</strong></td>
+                <td>61.2</td>
+                <td class="num-second">61.9</td>
+                <td class="num-second">63.1 (Matches 100-step OPSD!)</td>
+                <td class="num-second">65.0</td>
+                <td class="num-second">65.8</td>
+                <td class="num-second">65.3</td>
+              </tr>
+              <tr>
+                <td><strong>OPSD</strong></td>
+                <td>61.2</td>
+                <td>60.1</td>
+                <td>61.0</td>
+                <td>60.6</td>
+                <td>61.9</td>
+                <td>63.1</td>
+              </tr>
+              <tr>
+                <td><strong>GRPO</strong></td>
+                <td>61.2</td>
+                <td>60.0</td>
+                <td>60.8</td>
+                <td>60.8</td>
+                <td>61.8</td>
+                <td>60.7 (Table 1: 62.3 after 500 steps)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:0.8rem;color:var(--muted);margin-top:10px;">
+          Values are three-benchmark means computed from the Figure 4 checkpoint data. Table 1 reports a selected checkpoint per run (it matches Step 80 for Self-G and Step 60 for External-G), so the Step-100 column here can be lower than Table 1.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 07: BibTeX Citation -->
+  <section id="citation" style="border-bottom:none;">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-eyebrow">07 · Citation</div>
+        <h2 class="section-title">BibTeX Citation</h2>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--muted);">arXiv:2610.02700</span>
+          <button class="btn" id="copyBibBtn" style="padding:5px 12px;font-size:0.78rem;">📋 Copy BibTeX</button>
+        </div>
+        <pre class="code-box" id="bibBlock" style="margin:0;">@article{li2026learning,
+  title   = {Learning from Evolving Errors: Adaptive Iterative Repair for On-Policy Distillation},
+  author  = {Li, Rui and He, Liyang and Zhang, Zheng and Huang, Zhenya and Zhu, Linbo and Liu, Qi},
+  journal = {arXiv preprint arXiv:2610.02700},
+  year    = {2026}
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      AIR-OPD · Learning from Evolving Errors: Adaptive Iterative Repair for On-Policy Distillation · <a href="https://arxiv.org/abs/2610.02700" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:none;">arXiv</a> · Code: IN REVIEW
+    </div>
+  </footer>
+
+  <script>
+    // Helper to trigger KaTeX math rendering inside dynamically updated containers
+    function renderMath(el) {
+      if (window.renderMathInElement && el) {
+        window.renderMathInElement(el, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "\\[", right: "\\]", display: true },
+            { left: "\\(", right: "\\)", display: false },
+            { left: "$", right: "$", display: false }
+          ],
+          throwOnError: false
+        });
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      renderMath(document.body);
+
+      // Theme Toggle
+      const themeBtn = document.getElementById("themeToggleBtn");
+      const themeIcon = document.getElementById("themeIcon");
+      themeBtn.addEventListener("click", () => {
+        const cur = document.documentElement.getAttribute("data-theme") || "light";
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        themeIcon.textContent = next === "dark" ? "☀️" : "🌙";
+      });
+
+      // Language Toggle (EN / 中文)
+      const langBtn = document.getElementById("langToggleBtn");
+      const langLabel = document.getElementById("langToggleLabel");
+      document.documentElement.setAttribute("data-lang", "en");
+      langBtn.addEventListener("click", () => {
+        const cur = document.documentElement.getAttribute("data-lang") || "en";
+        const next = cur === "en" ? "zh" : "en";
+        document.documentElement.setAttribute("data-lang", next);
+        langLabel.textContent = next === "en" ? "中文" : "EN";
+        renderMath(document.body);
+      });
+
+      // =========================================================================
+      // Section 03: Interactive Supervision Region & Corrective Mass Sandbox
+      // =========================================================================
+      const BLOCKS = [
+        {
+          id: "B0",
+          name: "Block 0 · Prefix",
+          mass: 0.0,
+          isPrefix: true,
+          text: "Terry has C(20,2) = 190 choices and Mary has C(18,2) = 153 choices."
+        },
+        {
+          id: "B1",
+          name: "Block 1 · Anchor b_t",
+          mass: 0.52,
+          isAnchor: true,
+          text: "[ANCHOR a_0] So total pairs of choices is: 190 × 153 = 29170."
+        },
+        {
+          id: "B2",
+          name: "Block 2 · Casework",
+          mass: 0.14,
+          text: "Favorable outcomes: two reds = 1260, two blues = 1260; sum = 2520."
+        },
+        {
+          id: "B3",
+          name: "Block 3 · Fraction",
+          mass: 0.26,
+          text: "Form probability fraction P = 2520 / 29170 and simplify by GCD."
+        },
+        {
+          id: "B4",
+          name: "Block 4 · Reduction",
+          mass: 0.05,
+          text: "Euclidean reduction of 2520 / 29170 yields 12 / 139."
+        },
+        {
+          id: "B5",
+          name: "Block 5 · Tail Box",
+          mass: 0.03,
+          text: "Since m = 12 and n = 139 are coprime, m + n = $\\boxed{151}$."
+        }
+      ];
+
+      let currentSpanMode = "air_default";
+      let currentEps = 0.10;
+
+      function updateSandbox() {
+        const slider = document.getElementById("epsSlider");
+        const epsLabel = document.getElementById("epsValLabel");
+        const banner = document.getElementById("sandboxBanner");
+        const barsContainer = document.getElementById("massBarsContainer");
+        const preview = document.getElementById("sandboxRolloutPreview");
+
+        slider.disabled = (currentSpanMode !== "air_default");
+        slider.style.opacity = (currentSpanMode === "air_default") ? "1" : "0.45";
+
+        const totalSuffixMass = BLOCKS.slice(1).reduce((acc, b) => acc + b.mass, 0);
+        const targetMass = (1 - currentEps) * totalSuffixMass;
+
+        let endIdx = 5; // inclusive index in BLOCKS (1..5)
+        if (currentSpanMode === "air_default") {
+          let cum = 0;
+          for (let i = 1; i < BLOCKS.length; i++) {
+            cum += BLOCKS[i].mass;
+            if (cum >= targetMass - 1e-6) {
+              endIdx = i;
+              break;
+            }
+          }
+          epsLabel.textContent = `ε = ${currentEps.toFixed(2)} (Retains ≥${Math.round((1 - currentEps) * 100)}% Mass → Ends at Block ${endIdx})`;
+          banner.style.background = "var(--ok-bg)";
+          banner.style.borderColor = "var(--ok-border)";
+          banner.style.color = "var(--ok-fg)";
+          banner.innerHTML = `<strong>✅ AIR-OPD Error-Aligned Region $R_t = y_t[b_t:e_t]$ (Math Avg: 65.8%):</strong> Starts at exact match $b_t$ of anchor $a_0$ (Block 1) and stops at the earliest block endpoint $e_t$ (Block ${endIdx}) capturing $\\ge ${(100 * (1 - currentEps)).toFixed(0)}\\%$ of the guided teacher's corrective probability mass $C_{t,j}$. Valid prefix (Block 0) and low-signal tail blocks are excluded.`;
+        } else if (currentSpanMode === "error_block") {
+          endIdx = 1;
+          epsLabel.textContent = "Fixed: Error Block Only (Block 1)";
+          banner.style.background = "var(--warn-bg)";
+          banner.style.borderColor = "var(--warn-border)";
+          banner.style.color = "var(--warn-fg)";
+          banner.innerHTML = `<strong>⚠️ Ablation · Error Block Only (Math Avg: 64.2% · −1.6 pts):</strong> Truncates supervision at the end of Block 1 ($52\\%$ of corrective mass), discarding downstream blocks (Blocks 2–3) where the denominator $29170$ directly enters the probability fraction.`;
+        } else if (currentSpanMode === "full_response") {
+          endIdx = 5;
+          epsLabel.textContent = "Fixed: All Tokens (Blocks 0–5)";
+          banner.style.background = "var(--warn-bg)";
+          banner.style.borderColor = "var(--warn-border)";
+          banner.style.color = "var(--warn-fg)";
+          banner.innerHTML = `<strong>⚠️ Ablation · w/o Error Alignment (Math Avg: 64.7% · −1.1 pts):</strong> Supervises every token from Block 0 to Block 5 under $g_t$, diluting the corrective gradient with already-correct prefix steps and noisy tail steps.`;
+        } else {
+          endIdx = 5;
+          epsLabel.textContent = "OPSD Failed-Only (Full Reference z)";
+          banner.style.background = "var(--danger-bg)";
+          banner.style.borderColor = "var(--danger-border)";
+          banner.style.color = "var(--danger-fg)";
+          banner.innerHTML = `<strong>❌ Ablation · Failure-Only OPSD w/ Static Reference $z$ (Math Avg: 62.5% · −3.3 pts):</strong> Conditions the teacher on the static full reference solution $z$ instead of repair guidance $g_t$ and supervises all tokens (Blocks 0–5). Actually performs <em>worse</em> than standard OPSD (63.1%)!`;
+        }
+
+        barsContainer.innerHTML = BLOCKS.map((b, idx) => {
+          const isSup = (currentSpanMode === "full_response" || currentSpanMode === "opsd_failed")
+            ? true
+            : (idx >= 1 && idx <= endIdx);
+          const pct = Math.round(b.mass * 100);
+          return `
+            <div class="mass-col ${isSup ? 'supervised' : ''} ${b.isAnchor ? 'anchor-start' : ''}">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;font-family:var(--font-mono);font-weight:700;">
+                  <span>${b.name}</span>
+                  <span style="color:${isSup ? 'var(--primary)' : 'var(--muted)'};">${isSup ? '✓ Supervised' : 'Excluded'}</span>
+                </div>
+              </div>
+              <div class="mass-bar-track">
+                <div class="mass-bar-fill" style="height:${Math.max(pct * 1.4, 4)}%;opacity:${isSup ? '1' : '0.32'};"></div>
+              </div>
+              <div style="font-size:0.73rem;font-family:var(--font-mono);text-align:center;">
+                Mass $C_{t,j}$: <strong>${pct}%</strong>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        preview.innerHTML = BLOCKS.map((b, idx) => {
+          const isSup = (currentSpanMode === "full_response" || currentSpanMode === "opsd_failed")
+            ? true
+            : (idx >= 1 && idx <= endIdx);
+          const labelTag = b.isAnchor
+            ? `<span class="anchor-mark">Anchor b_t</span> `
+            : (idx === endIdx && currentSpanMode === "air_default" ? `<span class="pill pill-self" style="font-size:0.66rem;padding:1px 6px;">Endpoint e_t</span> ` : "");
+          if (isSup) {
+            return `<span class="region-mark"><strong>[${b.id} · Supervised in R_t]</strong> ${labelTag}${b.text}</span>`;
+          }
+          return `<div class="unsupervised-dim" style="padding:4px 12px;">[${b.id} · Unsupervised] ${b.text}</div>`;
+        }).join("");
+
+        renderMath(banner);
+        renderMath(barsContainer);
+        renderMath(preview);
+      }
+
+      document.getElementById("spanModeBtns").addEventListener("click", (e) => {
+        const btn = e.target.closest(".seg-btn");
+        if (!btn) return;
+        document.querySelectorAll("#spanModeBtns .seg-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentSpanMode = btn.dataset.mode;
+        updateSandbox();
+      });
+
+      document.getElementById("epsSlider").addEventListener("input", (e) => {
+        currentEps = parseFloat(e.target.value);
+        updateSandbox();
+      });
+      updateSandbox();
+
+      // =========================================================================
+      // Section 04: Interactive 3-Round Evolving Error Case Study
+      // =========================================================================
+      const CASE_ROUNDS = [
+        {
+          round: "Round 0 · Initial Rollout y₀",
+          title: "Arithmetic Slip in Denominator (190 × 153 = 29170)",
+          badge: "V(y₀) = 0 · s₀ = 0 (Retry Fails)",
+          badgeClass: "pill-danger",
+          weight: "w₀ = 1.0 / 2.2 ≈ 0.45",
+          rolloutHtml: `[Prefix · Correct] Terry has \\(\\binom{20}{2} = 190\\) choices and Mary has \\(\\binom{18}{2} = 153\\) choices.
+<span class="region-mark"><span class="anchor-mark">Error Anchor a₀: 190 \\times 153 = 29170</span>
+So the total number of possible pairs of choices (Terry picks first, then Mary) is: \\[190 \\times 153 = 29170\\]
+[Downstream within R₀] Only two favorable cases are considered (both picking two reds = 1260, both picking two blues = 1260):
+Total favorable outcomes: \\(1260 + 1260 = 2520\\).
+\\[\\frac{2520}{29170} = \\frac{12}{139} \\implies m + n = \\boxed{151}\\]</span>`,
+          anchor: "190 \\times 153 = 29170",
+          guidance: "The incorrect solution miscalculates the total number of possible outcomes as 190 × 153 = 29170, but the correct value is 190 × 153 = 29070. This error arises from an arithmetic mistake in multiplication. Compute C(20,2) × C(18,2) = 190 × 153 = 29070, ensuring the denominator is accurate for the probability computation.",
+          why: "Generator G identifies the earliest causal error (29170 vs 29070). Teacher p_T conditions on g₀ and supervises R₀. However, because y₀ ALSO omitted Case 3 (1 red + 1 blue), fixing the denominator alone in y₁ will not yet reach 441—demonstrating why multi-round adaptive repair is essential!"
+        },
+        {
+          round: "Round 1 · First On-Policy Retry y₁",
+          title: "Denominator Fixed (29070) → Exposes Omitted Case 3!",
+          badge: "V(y₁) = 0 · s₁ = 1 (Next Retry Passes!)",
+          badgeClass: "pill-ok",
+          weight: "w₁ = (0.8¹ × 1.5¹) / 2.2 = 1.2 / 2.2 ≈ 0.55",
+          rolloutHtml: `[Adopted Round-0 Fix ✓] So the total number of possible outcomes (Terry's pick × Mary's pick) is:
+\\[190 \\times 153 = \\boxed{29070}\\]
+So the correct total number of outcomes is 29070, not 29170.
+<span class="region-mark"><span class="anchor-mark">New Error Anchor a₁: Total favorable outcomes</span>
+\\[1260 + 1260 = 2520\\]
+[Downstream within R₁] Repeating the faulty Euclidean remainder chain on 2520 / 29070 lands on:
+\\[\\frac{2520}{29070} = \\frac{12}{139} \\implies m + n = \\boxed{151}\\]</span>`,
+          anchor: "Total favorable outcomes",
+          guidance: "Add the 8100 favorable outcomes from Case 3 (both picking one red and one blue) to the total, resulting in 1260 + 1260 + 8100 = 10620.",
+          why: "In Round 1, the student successfully applied g₀ (29070), so the earliest remaining error shifts to 'Total favorable outcomes' (missing Case 3: one red and one blue). Because the subsequent retry y₂ passes verification (s₁ = 1), Stage 1 receives the outcome bonus ρ = 1.5, giving it weight w₁ = 0.55 > w₀ = 0.45!"
+        },
+        {
+          round: "Round 2 · Second On-Policy Retry y₂",
+          title: "Both Errors Repaired → Verified Correct (441)!",
+          badge: "V(y₂) = 1 · Trajectory Terminated ✓",
+          badgeClass: "pill-self",
+          weight: "Verified Terminal Rollout (Credits s₁ = 1)",
+          rolloutHtml: `[Preserves Round-0 Fix ✓] Total outcomes = \\(190 \\times 153 = 29070\\). Cases 1 & 2 (both 2 red or both 2 blue) = \\(1260 + 1260\\).
+<span class="region-mark" style="border-left-color:#0d9488;background:var(--ok-bg);"><strong>[Applies Round-1 Replacement Guidance g₁ ✓] Case 3: Both pick one red and one blue.</strong>
+Terry can pick 1 red and 1 blue in \\(\\binom{10}{1}\\times\\binom{10}{1} = 100\\) ways; 9 reds and 9 blues remain, so Mary has \\(\\binom{9}{1}\\times\\binom{9}{1} = 81\\) ways, giving \\(100 \\times 81 = 8100\\).
+Total favorable outcomes: \\[1260 + 1260 + 8100 = \\boxed{10620}\\]
+Simplifying by \\(\\gcd(10620, 29070) = 90\\):
+\\[\\frac{10620}{29070} = \\frac{118}{323} \\implies m = 118,\\; n = 323 \\implies m + n = \\boxed{441}\\;\\checkmark\\]</span>`,
+          anchor: "no_repair (Verified Correct: V(y₂) = 1)",
+          guidance: "Trajectory passes outcome verifier V(y₂) = 1! Repair loop terminates and returns stage-weighted loss L_n = 0.45 L_{n,0} + 0.55 L_{n,1}.",
+          why: "The retry combines both repairs into a self-contained derivation and passes the verifier, which ends the repair loop. This verified outcome is what grants Stage 1 its outcome bonus (s₁ = 1). No guidance is provided at evaluation time."
+        }
+      ];
+
+      let activeCaseIdx = 0;
+
+      function renderCaseStudy() {
+        const tl = document.getElementById("caseTimeline");
+        tl.innerHTML = CASE_ROUNDS.map((c, idx) => `
+          <div class="tl-node ${idx === activeCaseIdx ? 'active' : ''}" data-idx="${idx}">
+            <div class="tl-step-idx">
+              <span>${c.round}</span>
+              <span>${c.weight}</span>
+            </div>
+            <div class="tl-step-title">${c.title}</div>
+            <div style="margin-top:8px;"><span class="pill ${c.badgeClass}">${c.badge}</span></div>
+          </div>
+        `).join("");
+
+        const cur = CASE_ROUNDS[activeCaseIdx];
+        const detail = document.getElementById("caseDetailContainer");
+        detail.innerHTML = `
+          <div class="grid-2">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">
+                Student On-Policy Rollout &amp; Supervised Span $R_t$
+              </div>
+              <div class="code-box">${cur.rolloutHtml}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div style="padding:14px 16px;border-radius:10px;background:var(--warn-bg);border:1px solid var(--warn-border);">
+                <div style="font-family:var(--font-mono);font-size:0.74rem;font-weight:700;color:var(--warn-fg);text-transform:uppercase;margin-bottom:4px;">
+                  Verbatim Error Anchor $a_t$ &amp; Synthesized Guidance $g_t$
+                </div>
+                <div style="font-size:0.83rem;margin-bottom:6px;"><strong>Anchor $a_t$:</strong> <code>${cur.anchor}</code></div>
+                <div style="font-size:0.84rem;color:var(--fg-secondary);"><strong>Guidance $g_t$:</strong> ${cur.guidance}</div>
+              </div>
+              <div style="padding:14px 16px;border-radius:10px;background:var(--self-bg);border:1px solid var(--self-border);">
+                <div style="font-family:var(--font-mono);font-size:0.74rem;font-weight:700;color:var(--self-fg);text-transform:uppercase;margin-bottom:4px;">
+                  Supervision &amp; Stage-Weighting Mechanism
+                </div>
+                <div style="font-size:0.84rem;color:var(--fg-secondary);">${cur.why}</div>
+              </div>
+            </div>
+          </div>
+        `;
+        renderMath(detail);
+      }
+
+      document.getElementById("caseTimeline").addEventListener("click", (e) => {
+        const node = e.target.closest(".tl-node");
+        if (!node) return;
+        activeCaseIdx = parseInt(node.dataset.idx, 10);
+        renderCaseStudy();
+      });
+      renderCaseStudy();
+
+      // =========================================================================
+      // Section 05: Outcome-Aware Stage Weighting Calculator & Prompt Viewer
+      // =========================================================================
+      let gamma = 0.80;
+      let rho = 1.50;
+      let scenario = "r2_pass";
+
+      function renderWeights() {
+        document.getElementById("gammaVal").textContent = gamma.toFixed(2);
+        document.getElementById("rhoVal").textContent = rho.toFixed(2);
+
+        let stages = [];
+        if (scenario === "r2_pass") {
+          stages = [
+            { t: 0, s: 0, desc: "Stage 0 (Initial y₀; Retry y₁ still wrong → s₀ = 0)" },
+            { t: 1, s: 1, desc: "Stage 1 (Retry y₁; Retry y₂ verified correct → s₁ = 1 ★)" }
+          ];
+        } else if (scenario === "r3_pass") {
+          stages = [
+            { t: 0, s: 0, desc: "Stage 0 (Initial y₀; Retry y₁ wrong → s₀ = 0)" },
+            { t: 1, s: 0, desc: "Stage 1 (Retry y₁; Retry y₂ wrong → s₁ = 0)" },
+            { t: 2, s: 1, desc: "Stage 2 (Retry y₂; Retry y₃ verified correct → s₂ = 1 ★)" }
+          ];
+        } else {
+          stages = [
+            { t: 0, s: 0, desc: "Stage 0 (Initial y₀; Retry y₁ wrong → s₀ = 0)" },
+            { t: 1, s: 0, desc: "Stage 1 (Retry y₁; Retry y₂ wrong → s₁ = 0)" },
+            { t: 2, s: 0, desc: "Stage 2 (Final round K=3; no further retry → s₂ = 0)" }
+          ];
+        }
+
+        const rawW = stages.map(st => Math.pow(gamma, st.t) * Math.pow(rho, st.s));
+        const sumW = rawW.reduce((a, b) => a + b, 0);
+
+        const out = document.getElementById("weightBarsOutput");
+        out.innerHTML = stages.map((st, idx) => {
+          const w = rawW[idx] / sumW;
+          const pct = (w * 100).toFixed(1);
+          const color = st.s === 1 ? "#ea580c" : "#2563eb";
+          return `
+            <div class="bar-row" style="margin-bottom:12px;">
+              <div class="bar-row-top">
+                <span><strong>${st.desc}</strong></span>
+                <span style="font-family:var(--font-mono);font-weight:700;color:${color};">
+                  w̃_${st.t} = ${rawW[idx].toFixed(2)} → w_${st.t} = ${w.toFixed(3)} (${pct}%)
+                </span>
+              </div>
+              <div class="bar-track" style="height:12px;">
+                <div class="bar-fill" style="width:${pct}%;background:${color};"></div>
+              </div>
+            </div>
+          `;
+        }).join("") + `
+          <div style="font-size:0.78rem;color:var(--muted);font-family:var(--font-mono);margin-top:8px;">
+            Normalized trajectory sum: ∑ w_t = 1.000 (prevents multi-round trajectories from inflating batch gradients).
+          </div>
+        `;
+      }
+
+      document.getElementById("weightPresetBtns").addEventListener("click", (e) => {
+        const btn = e.target.closest(".seg-btn");
+        if (!btn) return;
+        document.querySelectorAll("#weightPresetBtns .seg-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        gamma = parseFloat(btn.dataset.g);
+        rho = parseFloat(btn.dataset.r);
+        document.getElementById("gammaSlider").value = gamma;
+        document.getElementById("rhoSlider").value = rho;
+        renderWeights();
+      });
+
+      document.getElementById("gammaSlider").addEventListener("input", (e) => {
+        gamma = parseFloat(e.target.value);
+        document.querySelectorAll("#weightPresetBtns .seg-btn").forEach(b => b.classList.remove("active"));
+        renderWeights();
+      });
+
+      document.getElementById("rhoSlider").addEventListener("input", (e) => {
+        rho = parseFloat(e.target.value);
+        document.querySelectorAll("#weightPresetBtns .seg-btn").forEach(b => b.classList.remove("active"));
+        renderWeights();
+      });
+
+      document.getElementById("scenarioBtns").addEventListener("click", (e) => {
+        const btn = e.target.closest(".seg-btn");
+        if (!btn) return;
+        document.querySelectorAll("#scenarioBtns .seg-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        scenario = btn.dataset.scen;
+        renderWeights();
+      });
+      renderWeights();
+
+      // Prompt & Algorithm Tabs
+      const PROMPTS = {
+        alg: `// Algorithm 1: AIR-OPD Multi-Round Repair & Stage-Weighted Distillation
+Input: Minibatch B of (problem q, reference solution z), student p_θ, frozen teacher p_T,
+       outcome verifier V, guidance generator G
+Hyperparameters: repair budget K = 3, tolerance ε = 0.1, temporal γ = 0.8, bonus ρ = 1.5
+
+for each (q, z) in B (indexed by n) do:
+  S_n ← ∅,  t ← 0,  H_0 ← Render(q)
+  Sample initial on-policy response y_0 ~ p_θ(· | H_0)
+
+  while t < K and y_t is well-formed with V(y_t) == 0 do:
+    (a_t, g_t) ← G(q, z, H_t, y_t)
+    if (a_t, g_t) fails format / verbatim-anchor / answer-leak validation:
+      break
+    b_t ← exact match start position of anchor a_t in y_t
+    e_t ← earliest blank-line block endpoint retaining ≥ (1 - ε) of corrective mass C_{t,j}
+    Compute stage KL loss L_{n,t} over repair region R_t = y_t[b_t : e_t]
+    Add (t, L_{n,t}) to S_n
+    H_{t+1} ← Update(H_t, y_t, g_t)
+    if t < K - 1:
+      Sample on-policy retry y_{t+1} ~ p_θ(· | H_{t+1})
+    s_{n,t} ← 1 if V(y_{t+1}) == 1 else 0   (0 if no retry was sampled)
+    t ← t + 1
+
+  if S_n ≠ ∅:
+    w_{n,t} ← (γ^t · ρ^{s_{n,t}}) / ∑_{k=0}^{T_n} (γ^k · ρ^{s_{n,k}})
+    L_n ← ∑_{t=0}^{T_n} w_{n,t} · L_{n,t}
+
+return L_AIR-OPD = (1 / |B|) ∑_{n ∈ B} L_n`,
+        round1: `[Problem]
+{problem}
+[Private Correct Final Answer]
+{private_answer}
+[Reference Solution]
+{private_reference_solution}
+[QUOTE SOURCE - Incorrect Solution]
+{incorrect_response}
+------------------------------------------------------------------------
+Diagnose [QUOTE SOURCE - Incorrect Solution] using the Reference Solution and
+the Private Correct Final Answer as privileged checking evidence. First decide
+whether the quoted response is mathematically correct.
+
+If the response is not mathematically correct, identify the earliest causal
+mathematical error that still affects the conclusion. The <error_quote> MUST
+contain only a short, verbatim, contiguous substring copied from
+[QUOTE SOURCE - Incorrect Solution].
+
+The <repair_guidance> must identify the exact mistake, explain how to fix it,
+and state the correct governing logic. It must be problem-specific, actionable,
+answer-free, and must not reproduce a complete corrected solution or reveal the
+final answer.
+
+Respond strictly in one of these forms:
+<decision>no_repair</decision>
+or:
+<decision>repair</decision>
+<error_quote>A short exact substring copied from QUOTE SOURCE</error_quote>
+<repair_guidance>Identify the exact mistake and state the governing logic without revealing the final answer</repair_guidance>`,
+        round2: `[Problem]
+{problem}
+[Private Correct Final Answer]
+{private_answer}
+[Reference Solution]
+{private_reference_solution}
+[QUOTE SOURCE - Latest Response]
+{latest_incorrect_response}
+[Current Repair Guidance]
+{current_repair_guidance}
+------------------------------------------------------------------------
+Diagnose [QUOTE SOURCE - Latest Response] after Current Repair Guidance has
+been applied. If the latest response is mathematically correct, output no_repair.
+
+If it is not mathematically correct, write a replacement repair guidance:
+identify the earliest remaining causal mathematical error that still affects the
+conclusion, correct only that bottleneck, and give exactly one next operation
+the solver can perform. Do not merely restate a correction that has already been
+executed. Preserve still-valid prior guidance and replace guidance that is now
+misleading.`,
+        dialogue: `=== Initial User Turn (H_0) ===
+Problem: {problem}
+Please reason step by step, and put your final answer within \\boxed{}.
+
+=== Feedback Turn Appended After Unsuccessful Response y_t (H_{t+1}) ===
+The previous answer is incorrect.  [Round 2+: "The previous answer is still incorrect."]
+
+Use the following repair guidance, which explains how to correct the reasoning:
+=== Repair Guidance Begin ===
+{current_repair_guidance}
+=== Repair Guidance End ===
+
+Revise the reasoning and answer again. Do not simply repeat the previous attempt.
+Please reason step by step, and put your final answer within \\boxed{}.`
+      };
+
+      const promptBox = document.getElementById("promptBoxContent");
+      promptBox.textContent = PROMPTS.alg;
+      document.getElementById("promptTabs").addEventListener("click", (e) => {
+        const btn = e.target.closest(".seg-btn");
+        if (!btn) return;
+        document.querySelectorAll("#promptTabs .seg-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        promptBox.textContent = PROMPTS[btn.dataset.pt] || "";
+      });
+
+      // =========================================================================
+      // Section 06: Empirical Results Tabs
+      // =========================================================================
+      document.getElementById("resTabs").addEventListener("click", (e) => {
+        const btn = e.target.closest(".res-tab");
+        if (!btn) return;
+        document.querySelectorAll("#resTabs .res-tab").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".res-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(btn.dataset.panel).classList.add("active");
+      });
+
+      // Copy BibTeX
+      document.getElementById("copyBibBtn").addEventListener("click", () => {
+        const text = document.getElementById("bibBlock").innerText;
+        navigator.clipboard.writeText(text).then(() => {
+          const btn = document.getElementById("copyBibBtn");
+          const orig = btn.textContent;
+          btn.textContent = "✓ Copied!";
+          setTimeout(() => { btn.textContent = orig; }, 1800);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
