@@ -532,6 +532,27 @@
       width: auto;
       max-width: 100%;
     }
+    .method-subsec {
+      margin-top: 34px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+    }
+    .method-subsec-header {
+      margin-bottom: 18px;
+    }
+    .method-subsec-header h3 {
+      font-size: 1.24rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+      color: var(--fg);
+    }
+    .method-subsec-header p {
+      margin: 0;
+      color: var(--fg-secondary);
+      font-size: 0.93rem;
+      max-width: 860px;
+    }
     .figure-caption strong { color: var(--fg); }
 
     /* Formula Block */
@@ -868,12 +889,9 @@
       </a>
       <nav class="nav-links" aria-label="Section navigation">
         <a href="#motivation"><span class="lang-en">01 · Motivation</span><span class="lang-zh">01 · 研究动机</span></a>
-        <a href="#framework"><span class="lang-en">02 · Framework</span><span class="lang-zh">02 · 方法框架</span></a>
-        <a href="#sandbox"><span class="lang-en">03 · Span Sandbox</span><span class="lang-zh">03 · 纠错区间沙盒</span></a>
-        <a href="#case-study"><span class="lang-en">04 · Evolving Errors</span><span class="lang-zh">04 · 真实轨迹回放</span></a>
-        <a href="#weighting"><span class="lang-en">05 · Stage Weighting</span><span class="lang-zh">05 · 阶段加权</span></a>
-        <a href="#results"><span class="lang-en">06 · Results (RQ1–RQ4)</span><span class="lang-zh">06 · 实验结果 (RQ1–RQ4)</span></a>
-        <a href="#citation"><span class="lang-en">07 · BibTeX</span><span class="lang-zh">07 · 引用</span></a>
+        <a href="#framework"><span class="lang-en">02 · Method &amp; Mechanism</span><span class="lang-zh">02 · 方法与机制</span></a>
+        <a href="#results"><span class="lang-en">03 · Results (RQ1–RQ4)</span><span class="lang-zh">03 · 实验结果 (RQ1–RQ4)</span></a>
+        <a href="#citation"><span class="lang-en">04 · BibTeX</span><span class="lang-zh">04 · 引用</span></a>
       </nav>
       <div class="nav-actions">
         <button class="icon-btn" id="langToggleBtn" title="Switch Language (English / 中文)">
@@ -1194,213 +1212,206 @@
           </p>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Section 03: Interactive Supervision Region & Corrective Mass Sandbox -->
-  <section id="sandbox">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-eyebrow">03 · Interactive Error-Alignment Sandbox</div>
-        <h2 class="section-title">
-          <span class="lang-en">How Corrective Probability Mass $C_{t,j}$ Selects the Supervision Region $R_t = y_t[b_t:e_t]$</span>
-          <span class="lang-zh">交互式沙盒：正向纠错概率质量 $C_{t,j}$ 如何确定最优蒸馏区间 $R_t = y_t[b_t:e_t]$</span>
-        </h2>
-        <p class="section-desc">
-          <span class="lang-en">
-            Why not supervise the whole failed response, or only the single paragraph containing the error? Toggle the supervision strategy or adjust the tail tolerance $\epsilon$ below to see how block-level corrective mass $C_{t,j}$ captures both the anchored error and its immediate downstream consequences while filtering out noisy tail tokens.
-          </span>
-          <span class="lang-zh">
-            为什么不能直接监督整条失败回复，或者只监督报错的那一个段落？请切换下方的监督策略或调节尾部容忍度阈值 $\epsilon$，观察各推理块的正向纠错质量 $C_{t,j}$ 如何精准覆盖“致错锚点 + 紧邻的可恢复推导区”，同时过滤掉尾部无关噪声。
-          </span>
-        </p>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);">
-          <div>
-            <div style="font-size:0.78rem;font-family:var(--font-mono);color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:6px;">
-              Select Supervision Strategy (Table 2 Ablation Comparison)
-            </div>
-            <div class="btn-group" id="spanModeBtns">
-              <button class="seg-btn active" data-mode="air_default">AIR-OPD Default (ε = 0.10 · 65.8%)</button>
-              <button class="seg-btn" data-mode="error_block">Ablation: Error Block Only (64.2% · −1.6 pts)</button>
-              <button class="seg-btn" data-mode="full_response">Ablation: w/o Error Alignment (64.7% · −1.1 pts)</button>
-              <button class="seg-btn" data-mode="opsd_failed">OPSD Failed-Only w/ Full Ref z (62.5% · −3.3 pts)</button>
-            </div>
-          </div>
-
-          <div style="min-width:250px;">
-            <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:var(--font-mono);font-weight:700;color:var(--fg-secondary);margin-bottom:4px;">
-              <span>Tolerance $\epsilon$ (Tail Discard):</span>
-              <span id="epsValLabel" style="color:var(--primary);">ε = 0.10 (Retains ≥90% Mass)</span>
-            </div>
-            <input type="range" id="epsSlider" min="0.02" max="0.55" step="0.01" value="0.10" style="width:100%;accent-color:var(--primary);cursor:pointer;">
-          </div>
-        </div>
-
-        <p style="font-size:0.78rem;color:var(--muted);margin:0 0 10px;">
-          <span class="lang-en">Note: per-block corrective-mass values in this sandbox are <strong>illustrative</strong> (not measured) and only demonstrate the endpoint rule; the Math Avg. numbers on the buttons are the measured ablation results.</span>
-          <span class="lang-zh">说明：沙盒中各推理块的纠错质量数值为<strong>示意值</strong>（非实测），仅用于演示终点选择规则；按钮上的 Math Avg. 为论文实测消融结果。</span>
-        </p>
-        <div id="sandboxBanner" style="padding:12px 16px;border-radius:8px;font-size:0.85rem;margin-bottom:16px;background:var(--ok-bg);border:1px solid var(--ok-border);color:var(--ok-fg);"></div>
-
-        <div style="font-size:0.78rem;font-family:var(--font-mono);color:var(--muted);font-weight:700;text-transform:uppercase;">
-          Reasoning Blocks in Failed Rollout $y_0$ (Partitioned at Blank-Line Boundaries $\mathcal{E}_t$)
-        </div>
-
-        <div class="mass-bars" id="massBarsContainer"></div>
-
-        <div id="sandboxRolloutPreview" class="code-box" style="margin-top:12px;font-size:0.81rem;"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section 04: Interactive Multi-Round Evolving Error Case Study -->
-  <section id="case-study">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-eyebrow">04 · Real Training Trajectory Inspector</div>
-        <h2 class="section-title">
-          <span class="lang-en">Step-by-Step Evolving Error Repair (Reconstructed from Qwen3-4B Self-Guidance Logs)</span>
-          <span class="lang-zh">三轮动态错题修复实录（重构自 Qwen3-4B 自指导训练真实日志）</span>
-        </h2>
-        <p class="section-desc">
-          <span class="lang-en">
-            Click through the 3 stages below (Appendix C.1 / Figure 1b) to see why a single static correction is often not enough: fixing an early arithmetic slip in Round 0 unmasks a deeper combinatorics omission in Round 1, which Round 2 then resolves.
-          </span>
-          <span class="lang-zh">
-            点击下方三个阶段（对应论文附录 C.1 与图 1b），直观了解为什么单次静态纠正往往不够：第 0 轮修复分母乘法笔误后，第 1 轮在策略重试暴露出深层的“分类讨论漏算”，随后第 2 轮精准补齐第三类情况并验证通过。
-          </span>
-        </p>
-      </div>
-
-      <div class="explorer-shell">
-        <div class="explorer-body">
-          <div style="padding:12px 16px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);margin-bottom:18px;font-size:0.87rem;">
-            <strong>Competition Problem ($q$):</strong> A jar has $10$ red candies and $10$ blue candies. Terry picks two candies at random, then Mary picks two of the remaining candies at random. Given that the probability that they get the same color combination, irrespective of order, is $m/n$, where $m$ and $n$ are relatively prime positive integers, find $m+n$.
-            <span class="pill pill-ok" style="margin-left:8px;">Ground-Truth Answer: 118/323 → m + n = 441</span>
-          </div>
-
-          <div class="timeline-steps" id="caseTimeline"></div>
-
-          <div id="caseDetailContainer"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Section 05: Outcome-Aware Stage Weighting -->
-  <section id="weighting">
-    <div class="container">
-      <div class="section-header">
-        <div class="section-eyebrow">05 · Outcome-Aware Stage Weighting</div>
-        <h2 class="section-title">
-          <span class="lang-en">Outcome-Aware Stage Weighting ($w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$)</span>
-          <span class="lang-zh">结果感知阶段加权机制 ($w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$)</span>
-        </h2>
-        <p class="section-desc">
-          <span class="lang-en">
-            Because a retry can fail even when its guidance successfully repaired the anchored error (as in Round 0 above), AIR-OPD does not discard or penalize failed retries—instead, it combines temporal decay $\gamma^t$ with an outcome bonus $\rho^{s_{n,t}}$ for stages whose immediate retry passes verification.
-          </span>
-          <span class="lang-zh">
-            正如上方第 0 轮所示，即使指导成功修复了当前锚点错误，重试仍可能因后续隐患而未通过验证。因此 AIR-OPD 不会丢弃或惩罚失败重试，而是将深度衰减因子 $\gamma^t$ 与“紧随重试通过验证”的奖励因子 $\rho^{s_{n,t}}$ 相结合。
-          </span>
-        </p>
-      </div>
-
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">
-              <span class="lang-en">Stage Weight Formulation &amp; Design Rationale</span>
-              <span class="lang-zh">权重定义与核心设计原则</span>
-            </h3>
-            <span class="pill pill-ext">§3.3 Stage Weights</span>
-          </div>
-          <div class="formula-box" style="margin-bottom:14px;font-size:0.86rem;line-height:1.7;">
-            $$w_{n,t} \;=\; \frac{\gamma^t \, \rho^{s_{n,t}}}{\sum_{k=0}^{T_n} \gamma^k \, \rho^{s_{n,k}}}$$
-            <div style="margin-top:6px;font-size:0.8rem;color:var(--fg-secondary);">
-              Default: $\gamma = 0.8$, $\rho = 1.5$, and $s_{n,t} = \mathbb{I}[V(y_{n,t+1}) = 1]$
-            </div>
-          </div>
-          <ul style="margin:0;padding-left:18px;font-size:0.84rem;color:var(--fg-secondary);line-height:1.7;">
-            <li>
-              <span class="lang-en"><strong>Preserve failed intermediate stages ($s_{n,t}=0$):</strong> A failed retry often resolves one genuine error before hitting a deeper flaw, so it retains base temporal weight $\gamma^t$ rather than zero weight.</span>
-              <span class="lang-zh"><strong>保留失败中间阶段 ($s_{n,t}=0$)：</strong>即便后续重试仍未全对，该轮指导往往也已经修复了一处真实错误，因此保留权重 $\gamma^t$ 而不直接置零。</span>
-            </li>
-            <li>
-              <span class="lang-en"><strong>Outcome bonus ($\rho = 1.5$) + gentle decay ($\gamma = 0.8$):</strong> Prioritizes early clean repairs while reinforcing stages whose immediate retry passes final verification ($s_{n,t}=1$).</span>
-              <span class="lang-zh"><strong>结果奖励 ($\rho = 1.5$) 与适度时间衰减 ($\gamma = 0.8$)：</strong>适度偏向较早轮次的直接修复，同时强化能使紧随重试直接通过验证的修复阶段。</span>
-            </li>
-            <li>
-              <span class="lang-en"><strong>Unit per-trajectory normalization ($\sum_t w_{n,t} = 1$):</strong> Ensures every failed problem contributes equal total weight regardless of how many rounds $T_n + 1 \le K$ it took.</span>
-              <span class="lang-zh"><strong>单题归一化约束 ($\sum_t w_{n,t} = 1$)：</strong>避免多轮迭代样本在批次梯度中产生不成比例的权重放大。</span>
-            </li>
-          </ul>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">
-              <span class="lang-en">Example Breakdown &amp; Measured Ablation</span>
-              <span class="lang-zh">两阶段示例权重分配与消融实测</span>
-            </h3>
-            <span class="pill pill-ok">Default: 65.8%</span>
-          </div>
-          <p style="font-size:0.83rem;color:var(--fg-secondary);margin-top:0;">
-            <span class="lang-en">For a 2-stage repair where Round 0 resolves the first error ($s_0 = 0$) and Round 1 passes verification ($s_1 = 1$) under default $\gamma=0.8, \rho=1.5$:</span>
-            <span class="lang-zh">以第 0 轮修复首错后仍失败 ($s_0 = 0$)、第 1 轮重试通过验证 ($s_1 = 1$) 的两阶段修复为例（默认 $\gamma=0.8, \rho=1.5$）：</span>
+      <!-- 2.1 Merged Pillar 1 Deep-Dive: Real 3-Round Evolving Error Case Study -->
+      <div class="method-subsec" id="case-study">
+        <div class="method-subsec-header">
+          <div class="section-eyebrow">2.1 · Pillar 1 Deep-Dive · Real Training Trajectory (§3.1)</div>
+          <h3>
+            <span class="lang-en">Step-by-Step Evolving Error Repair (Reconstructed from Qwen3-4B Self-Guidance Logs)</span>
+            <span class="lang-zh">三轮动态错题修复实录（重构自 Qwen3-4B 自指导训练真实日志）</span>
+          </h3>
+          <p>
+            <span class="lang-en">
+              Click through the 3 stages below (Appendix C.1 / Figure 1b) to see why a single static correction is often not enough: fixing an early arithmetic slip in Round 0 unmasks a deeper combinatorics omission in Round 1, which Round 2 then resolves.
+            </span>
+            <span class="lang-zh">
+              点击下方三个阶段（对应论文附录 C.1 与图 1b），直观了解为什么单次静态纠正往往不够：第 0 轮修复分母乘法笔误后，第 1 轮在策略重试暴露出深层的“分类讨论漏算”，随后第 2 轮精准补齐第三类情况并验证通过。
+            </span>
           </p>
+        </div>
 
-          <div style="margin:12px 0 16px;">
-            <div class="bar-row" style="margin-bottom:10px;">
-              <div class="bar-row-top">
-                <span><strong>Stage 0</strong> ($t=0, s_0=0$)</span>
-                <span style="font-family:var(--font-mono);font-weight:700;color:#2563eb;">w̃₀ = 1.00 → w₀ = 0.455 (45.5%)</span>
+        <div class="explorer-shell">
+          <div class="explorer-body">
+            <div style="padding:12px 16px;border-radius:10px;background:var(--bg-subtle);border:1px solid var(--border);margin-bottom:18px;font-size:0.87rem;">
+              <strong>Competition Problem ($q$):</strong> A jar has $10$ red candies and $10$ blue candies. Terry picks two candies at random, then Mary picks two of the remaining candies at random. Given that the probability that they get the same color combination, irrespective of order, is $m/n$, where $m$ and $n$ are relatively prime positive integers, find $m+n$.
+              <span class="pill pill-ok" style="margin-left:8px;">Ground-Truth Answer: 118/323 → m + n = 441</span>
+            </div>
+
+            <div class="timeline-steps" id="caseTimeline"></div>
+
+            <div id="caseDetailContainer"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2.2 Merged Pillar 2 Deep-Dive: Corrective Mass Span Sandbox -->
+      <div class="method-subsec" id="sandbox">
+        <div class="method-subsec-header">
+          <div class="section-eyebrow">2.2 · Pillar 2 Deep-Dive · Corrective Mass Span Rule (§3.2)</div>
+          <h3>
+            <span class="lang-en">How Corrective Probability Mass $C_{t,j}$ Selects the Supervision Region $R_t = y_t[b_t:e_t]$</span>
+            <span class="lang-zh">交互式沙盒：正向纠错概率质量 $C_{t,j}$ 如何确定最优蒸馏区间 $R_t = y_t[b_t:e_t]$</span>
+          </h3>
+          <p>
+            <span class="lang-en">
+              Why not supervise the whole failed response, or only the single paragraph containing the error? Toggle the supervision strategy or adjust the tail tolerance $\epsilon$ below to see how block-level corrective mass $C_{t,j}$ captures both the anchored error and its immediate downstream consequences while filtering out noisy tail tokens.
+            </span>
+            <span class="lang-zh">
+              为什么不能直接监督整条失败回复，或者只监督报错的那一个段落？请切换下方的监督策略或调节尾部容忍度阈值 $\epsilon$，观察各推理块的正向纠错质量 $C_{t,j}$ 如何精准覆盖“致错锚点 + 紧邻的可恢复推导区”，同时过滤掉尾部无关噪声。
+            </span>
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+            <div>
+              <div style="font-size:0.78rem;font-family:var(--font-mono);color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:6px;">
+                Select Supervision Strategy (Table 2 Ablation Comparison)
               </div>
-              <div class="bar-track" style="height:10px;">
-                <div class="bar-fill" style="width:45.5%;background:#2563eb;"></div>
+              <div class="btn-group" id="spanModeBtns">
+                <button class="seg-btn active" data-mode="air_default">AIR-OPD Default (ε = 0.10 · 65.8%)</button>
+                <button class="seg-btn" data-mode="error_block">Ablation: Error Block Only (64.2% · −1.6 pts)</button>
+                <button class="seg-btn" data-mode="full_response">Ablation: w/o Error Alignment (64.7% · −1.1 pts)</button>
+                <button class="seg-btn" data-mode="opsd_failed">OPSD Failed-Only w/ Full Ref z (62.5% · −3.3 pts)</button>
               </div>
             </div>
-            <div class="bar-row" style="margin-bottom:4px;">
-              <div class="bar-row-top">
-                <span><strong>Stage 1</strong> ($t=1, s_1=1$ ★)</span>
-                <span style="font-family:var(--font-mono);font-weight:700;color:#ea580c;">w̃₁ = 0.80×1.5 = 1.20 → w₁ = 0.545 (54.5%)</span>
+
+            <div style="min-width:250px;">
+              <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:var(--font-mono);font-weight:700;color:var(--fg-secondary);margin-bottom:4px;">
+                <span>Tolerance $\epsilon$ (Tail Discard):</span>
+                <span id="epsValLabel" style="color:var(--primary);">ε = 0.10 (Retains ≥90% Mass)</span>
               </div>
-              <div class="bar-track" style="height:10px;">
-                <div class="bar-fill" style="width:54.5%;background:#ea580c;"></div>
-              </div>
+              <input type="range" id="epsSlider" min="0.02" max="0.55" step="0.01" value="0.10" style="width:100%;accent-color:var(--primary);cursor:pointer;">
             </div>
           </div>
 
-          <div class="table-wrap">
-            <table class="data-table" style="font-size:0.8rem;">
-              <thead>
-                <tr>
-                  <th>Weighting Config <span style="text-transform:none;">$(\gamma, \rho)$</span></th>
-                  <th>Math Avg.</th>
-                  <th><span style="text-transform:none;">Δ</span> vs. Uniform</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>Uniform $(1.0, 1.0)$</td><td>65.0%</td><td>—</td></tr>
-                <tr><td>Temporal Decay Only $(0.8, 1.0)$</td><td>65.4%</td><td>+0.4</td></tr>
-                <tr><td>Outcome Bonus Only $(1.0, 1.5)$</td><td>65.4%</td><td>+0.4</td></tr>
-                <tr class="row-highlight"><td><strong>AIR-OPD Default $(0.8, 1.5)$</strong></td><td><strong>65.8%</strong></td><td><span class="delta-pos">+0.8</span></td></tr>
-              </tbody>
-            </table>
+          <p style="font-size:0.78rem;color:var(--muted);margin:0 0 10px;">
+            <span class="lang-en">Note: per-block corrective-mass values in this sandbox are <strong>illustrative</strong> (not measured) and only demonstrate the endpoint rule; the Math Avg. numbers on the buttons are the measured ablation results.</span>
+            <span class="lang-zh">说明：沙盒中各推理块的纠错质量数值为<strong>示意值</strong>（非实测），仅用于演示终点选择规则；按钮上的 Math Avg. 为论文实测消融结果。</span>
+          </p>
+          <div id="sandboxBanner" style="padding:12px 16px;border-radius:8px;font-size:0.85rem;margin-bottom:16px;background:var(--ok-bg);border:1px solid var(--ok-border);color:var(--ok-fg);"></div>
+
+          <div style="font-size:0.78rem;font-family:var(--font-mono);color:var(--muted);font-weight:700;text-transform:uppercase;">
+            Reasoning Blocks in Failed Rollout $y_0$ (Partitioned at Blank-Line Boundaries $\mathcal{E}_t$)
+          </div>
+
+          <div class="mass-bars" id="massBarsContainer"></div>
+
+          <div id="sandboxRolloutPreview" class="code-box" style="margin-top:12px;font-size:0.81rem;"></div>
+        </div>
+      </div>
+
+      <!-- 2.3 Merged Pillar 3 Deep-Dive: Outcome-Aware Stage Weighting -->
+      <div class="method-subsec" id="weighting">
+        <div class="method-subsec-header">
+          <div class="section-eyebrow">2.3 · Pillar 3 Deep-Dive · Outcome-Aware Stage Weighting (§3.3)</div>
+          <h3>
+            <span class="lang-en">Outcome-Aware Stage Weighting ($w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$)</span>
+            <span class="lang-zh">结果感知阶段加权机制 ($w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$)</span>
+          </h3>
+          <p>
+            <span class="lang-en">
+              Because a retry can fail even when its guidance successfully repaired the anchored error (as in Round 0 above), AIR-OPD does not discard or penalize failed retries—instead, it combines temporal decay $\gamma^t$ with an outcome bonus $\rho^{s_{n,t}}$ for stages whose immediate retry passes verification.
+            </span>
+            <span class="lang-zh">
+              正如上方第 0 轮所示，即使指导成功修复了当前锚点错误，重试仍可能因后续隐患而未通过验证。因此 AIR-OPD 不会丢弃或惩罚失败重试，而是将深度衰减因子 $\gamma^t$ 与“紧随重试通过验证”的奖励因子 $\rho^{s_{n,t}}$ 相结合。
+            </span>
+          </p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <span class="lang-en">Stage Weight Formulation &amp; Design Rationale</span>
+                <span class="lang-zh">权重定义与核心设计原则</span>
+              </h3>
+              <span class="pill pill-ext">§3.3 Stage Weights</span>
+            </div>
+            <div class="formula-box" style="margin-bottom:14px;font-size:0.86rem;line-height:1.7;">
+              $$w_{n,t} \;=\; \frac{\gamma^t \, \rho^{s_{n,t}}}{\sum_{k=0}^{T_n} \gamma^k \, \rho^{s_{n,k}}}$$
+              <div style="margin-top:6px;font-size:0.8rem;color:var(--fg-secondary);">
+                Default: $\gamma = 0.8$, $\rho = 1.5$, and $s_{n,t} = \mathbb{I}[V(y_{n,t+1}) = 1]$
+              </div>
+            </div>
+            <ul style="margin:0;padding-left:18px;font-size:0.84rem;color:var(--fg-secondary);line-height:1.7;">
+              <li>
+                <span class="lang-en"><strong>Preserve failed intermediate stages ($s_{n,t}=0$):</strong> A failed retry often resolves one genuine error before hitting a deeper flaw, so it retains base temporal weight $\gamma^t$ rather than zero weight.</span>
+                <span class="lang-zh"><strong>保留失败中间阶段 ($s_{n,t}=0$)：</strong>即便后续重试仍未全对，该轮指导往往也已经修复了一处真实错误，因此保留权重 $\gamma^t$ 而不直接置零。</span>
+              </li>
+              <li>
+                <span class="lang-en"><strong>Outcome bonus ($\rho = 1.5$) + gentle decay ($\gamma = 0.8$):</strong> Prioritizes early clean repairs while reinforcing stages whose immediate retry passes final verification ($s_{n,t}=1$).</span>
+                <span class="lang-zh"><strong>结果奖励 ($\rho = 1.5$) 与适度时间衰减 ($\gamma = 0.8$)：</strong>适度偏向较早轮次的直接修复，同时强化能使紧随重试直接通过验证的修复阶段。</span>
+              </li>
+              <li>
+                <span class="lang-en"><strong>Unit per-trajectory normalization ($\sum_t w_{n,t} = 1$):</strong> Ensures every failed problem contributes equal total weight regardless of how many rounds $T_n + 1 \le K$ it took.</span>
+                <span class="lang-zh"><strong>单题归一化约束 ($\sum_t w_{n,t} = 1$)：</strong>避免多轮迭代样本在批次梯度中产生不成比例的权重放大。</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <span class="lang-en">Example Breakdown &amp; Measured Ablation</span>
+                <span class="lang-zh">两阶段示例权重分配与消融实测</span>
+              </h3>
+              <span class="pill pill-ok">Default: 65.8%</span>
+            </div>
+            <p style="font-size:0.83rem;color:var(--fg-secondary);margin-top:0;">
+              <span class="lang-en">For a 2-stage repair where Round 0 resolves the first error ($s_0 = 0$) and Round 1 passes verification ($s_1 = 1$) under default $\gamma=0.8, \rho=1.5$:</span>
+              <span class="lang-zh">以第 0 轮修复首错后仍失败 ($s_0 = 0$)、第 1 轮重试通过验证 ($s_1 = 1$) 的两阶段修复为例（默认 $\gamma=0.8, \rho=1.5$）：</span>
+            </p>
+
+            <div style="margin:12px 0 16px;">
+              <div class="bar-row" style="margin-bottom:10px;">
+                <div class="bar-row-top">
+                  <span><strong>Stage 0</strong> ($t=0, s_0=0$)</span>
+                  <span style="font-family:var(--font-mono);font-weight:700;color:#2563eb;">w̃₀ = 1.00 → w₀ = 0.455 (45.5%)</span>
+                </div>
+                <div class="bar-track" style="height:10px;">
+                  <div class="bar-fill" style="width:45.5%;background:#2563eb;"></div>
+                </div>
+              </div>
+              <div class="bar-row" style="margin-bottom:4px;">
+                <div class="bar-row-top">
+                  <span><strong>Stage 1</strong> ($t=1, s_1=1$ ★)</span>
+                  <span style="font-family:var(--font-mono);font-weight:700;color:#ea580c;">w̃₁ = 0.80×1.5 = 1.20 → w₁ = 0.545 (54.5%)</span>
+                </div>
+                <div class="bar-track" style="height:10px;">
+                  <div class="bar-fill" style="width:54.5%;background:#ea580c;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="data-table" style="font-size:0.8rem;">
+                <thead>
+                  <tr>
+                    <th>Weighting Config <span style="text-transform:none;">$(\gamma, \rho)$</span></th>
+                    <th>Math Avg.</th>
+                    <th><span style="text-transform:none;">Δ</span> vs. Uniform</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Uniform $(1.0, 1.0)$</td><td>65.0%</td><td>—</td></tr>
+                  <tr><td>Temporal Decay Only $(0.8, 1.0)$</td><td>65.4%</td><td>+0.4</td></tr>
+                  <tr><td>Outcome Bonus Only $(1.0, 1.5)$</td><td>65.4%</td><td>+0.4</td></tr>
+                  <tr class="row-highlight"><td><strong>AIR-OPD Default $(0.8, 1.5)$</strong></td><td><strong>65.8%</strong></td><td><span class="delta-pos">+0.8</span></td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Section 06: Empirical Results (RQ1 - RQ4) -->
+  <!-- Section 03: Empirical Results (RQ1 - RQ4) -->
   <section id="results">
     <div class="container">
       <div class="section-header">
-        <div class="section-eyebrow">06 · Comprehensive Empirical Evaluation (RQ1 – RQ4)</div>
+        <div class="section-eyebrow">03 · Comprehensive Empirical Evaluation (RQ1 – RQ4)</div>
         <h2 class="section-title">
           <span class="lang-en">Main Results, Component Ablations, Repair Budget $K$, and Training Dynamics</span>
           <span class="lang-zh">实验结果全景：主表对比、核心消融、修复预算 $K$ 与训练收敛动力学</span>
@@ -1883,11 +1894,11 @@
     </div>
   </section>
 
-  <!-- Section 07: BibTeX Citation -->
+  <!-- Section 04: BibTeX Citation -->
   <section id="citation" style="border-bottom:none;">
     <div class="container">
       <div class="section-header">
-        <div class="section-eyebrow">07 · Citation</div>
+        <div class="section-eyebrow">04 · Citation</div>
         <h2 class="section-title">BibTeX Citation</h2>
       </div>
 
