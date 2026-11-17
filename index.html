@@ -510,6 +510,28 @@
       color: var(--fg-secondary);
       line-height: 1.55;
     }
+    .teaser-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.38fr) minmax(0, 0.92fr);
+      gap: 20px;
+      align-items: center;
+      margin-top: 20px;
+    }
+    @media (max-width: 920px) {
+      .teaser-split { grid-template-columns: 1fr; }
+    }
+    .teaser-split .figure-frame {
+      margin-top: 0;
+      padding: 14px;
+    }
+    .teaser-split .figure-img-wrap {
+      padding: 8px;
+    }
+    .teaser-split .figure-img-wrap img {
+      max-height: 540px;
+      width: auto;
+      max-width: 100%;
+    }
     .figure-caption strong { color: var(--fg); }
 
     /* Formula Block */
@@ -849,7 +871,7 @@
         <a href="#framework"><span class="lang-en">02 · Framework</span><span class="lang-zh">02 · 方法框架</span></a>
         <a href="#sandbox"><span class="lang-en">03 · Span Sandbox</span><span class="lang-zh">03 · 纠错区间沙盒</span></a>
         <a href="#case-study"><span class="lang-en">04 · Evolving Errors</span><span class="lang-zh">04 · 真实轨迹回放</span></a>
-        <a href="#weighting"><span class="lang-en">05 · Stage Weighting</span><span class="lang-zh">05 · 阶段加权与提示词</span></a>
+        <a href="#weighting"><span class="lang-en">05 · Stage Weighting</span><span class="lang-zh">05 · 阶段加权</span></a>
         <a href="#results"><span class="lang-en">06 · Results (RQ1–RQ4)</span><span class="lang-zh">06 · 实验结果 (RQ1–RQ4)</span></a>
         <a href="#citation"><span class="lang-en">07 · BibTeX</span><span class="lang-zh">07 · 引用</span></a>
       </nav>
@@ -912,16 +934,6 @@
           <span class="lang-zh">代码</span>
           <span class="btn-badge">IN REVIEW</span>
         </span>
-        <a href="#case-study" class="btn">
-          <span>🔍</span>
-          <span class="lang-en">Interactive 3-Round Repair Case</span>
-          <span class="lang-zh">交互式三轮错题修复回放</span>
-        </a>
-        <a href="#sandbox" class="btn">
-          <span>🎛️</span>
-          <span class="lang-en">Corrective Mass Span Sandbox</span>
-          <span class="lang-zh">纠错概率质量区间沙盒</span>
-        </a>
         <a href="#results" class="btn">
           <span>📊</span>
           <span class="lang-en">Main Results &amp; Dynamics</span>
@@ -1032,21 +1044,43 @@
         </div>
       </div>
 
-      <div class="figure-frame">
-        <div class="figure-img-wrap">
-          <img src="figures/intro/teaser.svg" alt="Figure 1: OPSD vs AIR-OPD on a failed mathematical reasoning attempt">
+      <div class="teaser-split">
+        <div class="figure-frame">
+          <div class="figure-img-wrap">
+            <img src="figures/intro/teaser.svg" alt="Figure 1: OPSD vs AIR-OPD on a failed mathematical reasoning attempt">
+          </div>
         </div>
-        <div class="figure-caption">
-          <span class="lang-en">
-            <strong>Figure 1 · Supervising the same failed attempt on a competition math problem.</strong>
-            <strong>(a) Standard OPSD</strong> conditions the teacher on the full reference solution $z$ and supervises every token of the failed attempt.
-            <strong>(b) AIR-OPD</strong> conditions the teacher on targeted repair guidance $g_t$ for the current error (Round 0 fixes the multiplication slip $190\times 153 = 29170 \to 29070$) and supervises only that region. When the student's retry exposes a second hidden error (omitting Case 3: one red and one blue candy), Round 1 synthesizes fresh guidance $g_1$ targeting that case until the retry is verified correct ($\boxed{441}$).
-          </span>
-          <span class="lang-zh">
-            <strong>图 1 · 对同一道数学竞赛失败轨迹的监督方式对比。</strong>
-            <strong>(a) 标准 OPSD</strong> 将完整参考解 $z$ 作为教师条件，对失败回复的每一个 Token 施加无差别监督。
-            <strong>(b) AIR-OPD</strong> 先针对当前错误生成修复指导 $g_0$（第 0 轮修复乘法笔误 $190\times 153 = 29170 \to 29070$）并仅监督该局部区间；当学生的在策略重试暴露出第二个隐藏错误（漏算“一红一蓝”第三种情况）时，第 1 轮动态生成新指导 $g_1$ 靶向该遗漏情况，直至重试通过验证（$\boxed{441}$）。
-          </span>
+        <div class="card" style="display:flex;flex-direction:column;gap:14px;">
+          <div class="card-header" style="margin-bottom:0;">
+            <h3 class="card-title">
+              <span class="lang-en">Figure 1 · Supervising a Failed Attempt</span>
+              <span class="lang-zh">图 1 · 失败解题轨迹的监督对比</span>
+            </h3>
+            <span class="pill pill-ok">OPSD vs. AIR-OPD</span>
+          </div>
+          <p style="font-size:0.84rem;color:var(--fg-secondary);margin:0;line-height:1.6;">
+            <span class="lang-en">
+              Both methods start from the exact same failed competition-math rollout $y_0$, yet differ in <em>what</em> the teacher conditions on and <em>where</em> KL supervision is applied:
+            </span>
+            <span class="lang-zh">
+              两种方法从同一条竞赛数学失败采样 $y_0$ 出发，核心差异在于教师的条件输入以及施加 KL 监督的位置：
+            </span>
+          </p>
+          <div style="padding:10px 12px;border-radius:8px;background:var(--danger-bg);border:1px solid var(--danger-border);font-size:0.81rem;color:var(--fg-secondary);">
+            <strong style="color:var(--danger-fg);">(a) Standard OPSD:</strong>
+            <span class="lang-en">Conditions the teacher on the full static reference solution $z$ and supervises every token of $y_0$, mixing valid prefix reasoning with unresolved errors.</span>
+            <span class="lang-zh">将完整参考解 $z$ 输入教师，对 $y_0$ 的全部 Token 无差别对齐，把已正确的推理前缀与错误混在一起。</span>
+          </div>
+          <div style="padding:10px 12px;border-radius:8px;background:var(--ok-bg);border:1px solid var(--ok-border);font-size:0.81rem;color:var(--fg-secondary);">
+            <strong style="color:var(--ok-fg);">(b) AIR-OPD · Round 0:</strong>
+            <span class="lang-en">Anchors the earliest flaw and supplies concise guidance $g_0$ fixing the multiplication slip ($190\times 153 = 29170 \to 29070$), supervising only that local repair span.</span>
+            <span class="lang-zh">锚定首个致错步骤并给出修复指导 $g_0$（纠正乘法笔误 $190\times 153 = 29170 \to 29070$），仅在局部纠错区间施加监督。</span>
+          </div>
+          <div style="padding:10px 12px;border-radius:8px;background:var(--ext-bg);border:1px solid var(--ext-border);font-size:0.81rem;color:var(--fg-secondary);">
+            <strong style="color:var(--ext-fg);">(b) AIR-OPD · Round 1:</strong>
+            <span class="lang-en">When on-policy retry $y_1$ exposes a second hidden error (omitting Case 3: one red &amp; one blue candy), fresh guidance $g_1$ targets that bottleneck until verification passes ($\boxed{441}$).</span>
+            <span class="lang-zh">当在策略重试 $y_1$ 暴露出第二处隐含错误（漏算“一红一蓝”第三种情况）时，第 1 轮动态生成新指导 $g_1$ 直至答案通过验证（$\boxed{441}$）。</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1256,86 +1290,104 @@
     </div>
   </section>
 
-  <!-- Section 05: Interactive Outcome-Aware Stage Weighting & Prompts -->
+  <!-- Section 05: Outcome-Aware Stage Weighting -->
   <section id="weighting">
     <div class="container">
       <div class="section-header">
-        <div class="section-eyebrow">05 · Stage Weighting Simulator &amp; Prompt Templates</div>
+        <div class="section-eyebrow">05 · Outcome-Aware Stage Weighting</div>
         <h2 class="section-title">
-          <span class="lang-en">Outcome-Aware Stage Weighting ($w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$) &amp; Exact Prompts</span>
-          <span class="lang-zh">结果感知阶段加权计算器与特权指导生成提示词</span>
+          <span class="lang-en">Outcome-Aware Stage Weighting ($w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$)</span>
+          <span class="lang-zh">结果感知阶段加权机制 ($w_{n,t} \propto \gamma^t \rho^{s_{n,t}}$)</span>
         </h2>
         <p class="section-desc">
           <span class="lang-en">
-            Because a retry can fail even when its guidance successfully repaired the anchored error (as in Round 0 above!), AIR-OPD does not penalize failed retries—instead, it combines a gentle temporal decay $\gamma^t$ with an outcome bonus $\rho^{s_{n,t}}$ for stages whose immediate retry passes verification.
+            Because a retry can fail even when its guidance successfully repaired the anchored error (as in Round 0 above), AIR-OPD does not discard or penalize failed retries—instead, it combines temporal decay $\gamma^t$ with an outcome bonus $\rho^{s_{n,t}}$ for stages whose immediate retry passes verification.
           </span>
           <span class="lang-zh">
-            正如上方第 0 轮所示，即使指导成功修复了当前锚点错误，重试仍可能因后续隐患而未通过验证。因此 AIR-OPD 不会惩罚失败重试，而是将深度衰减因子 $\gamma^t$ 与“紧随重试通过验证”的奖励因子 $\rho^{s_{n,t}}$ 相结合。
+            正如上方第 0 轮所示，即使指导成功修复了当前锚点错误，重试仍可能因后续隐患而未通过验证。因此 AIR-OPD 不会丢弃或惩罚失败重试，而是将深度衰减因子 $\gamma^t$ 与“紧随重试通过验证”的奖励因子 $\rho^{s_{n,t}}$ 相结合。
           </span>
         </p>
       </div>
 
       <div class="grid-2">
-        <!-- Left: Interactive Weighting Simulator -->
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">Interactive Stage Weighting Simulator</h3>
+            <h3 class="card-title">
+              <span class="lang-en">Stage Weight Formulation &amp; Design Rationale</span>
+              <span class="lang-zh">权重定义与核心设计原则</span>
+            </h3>
             <span class="pill pill-ext">§3.3 Stage Weights</span>
           </div>
-          <p style="font-size:0.84rem;color:var(--fg-secondary);margin-top:0;">
-            Select a preset from Table 2 or adjust $(\gamma, \rho)$ and retry outcomes $(s_0, s_1, s_2)$ to inspect how unit trajectory weight is distributed across repair stages:
-          </p>
-
-          <div class="btn-group" style="margin-bottom:14px;" id="weightPresetBtns">
-            <button class="seg-btn active" data-g="0.8" data-r="1.5">AIR-OPD Default (0.8, 1.5) · 65.8%</button>
-            <button class="seg-btn" data-g="0.8" data-r="1.0">Temporal Only (0.8, 1.0) · 65.4%</button>
-            <button class="seg-btn" data-g="1.0" data-r="1.5">Outcome Bonus Only (1.0, 1.5) · 65.4%</button>
-            <button class="seg-btn" data-g="1.0" data-r="1.0">Uniform (1.0, 1.0) · 65.0%</button>
+          <div class="formula-box" style="margin-bottom:14px;">
+            $$w_{n,t} \;=\; \frac{\gamma^t \, \rho^{s_{n,t}}}{\sum_{k=0}^{T_n} \gamma^k \, \rho^{s_{n,k}}}, \qquad \gamma = 0.8,\;\; \rho = 1.5,\;\; s_{n,t} = \mathbb{I}\!\left[V(y_{n,t+1}) = 1\right]$$
           </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-            <div style="background:var(--bg-subtle);padding:10px 12px;border-radius:8px;border:1px solid var(--border);">
-              <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:var(--font-mono);font-weight:700;">
-                <span>Temporal Factor $\gamma$:</span>
-                <span id="gammaVal" style="color:var(--primary);">0.80</span>
-              </div>
-              <input type="range" id="gammaSlider" min="0.50" max="1.00" step="0.05" value="0.80" style="width:100%;margin-top:6px;accent-color:var(--primary);">
-            </div>
-            <div style="background:var(--bg-subtle);padding:10px 12px;border-radius:8px;border:1px solid var(--border);">
-              <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-family:var(--font-mono);font-weight:700;">
-                <span>Outcome Bonus $\rho$:</span>
-                <span id="rhoVal" style="color:#ea580c;">1.50</span>
-              </div>
-              <input type="range" id="rhoSlider" min="1.00" max="2.50" step="0.05" value="1.50" style="width:100%;margin-top:6px;accent-color:#ea580c;">
-            </div>
-          </div>
-
-          <div style="margin-bottom:12px;">
-            <div style="font-size:0.76rem;font-family:var(--font-mono);color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:6px;">
-              Trajectory Outcome Scenario:
-            </div>
-            <div class="btn-group" id="scenarioBtns">
-              <button class="seg-btn active" data-scen="r2_pass">2-Stage Repair: R1 Fails (s₀=0), R2 Passes (s₁=1)</button>
-              <button class="seg-btn" data-scen="r3_pass">3-Stage Repair: s₀=0, s₁=0, R3 Passes (s₂=1)</button>
-              <button class="seg-btn" data-scen="all_fail">3-Stage Unresolved: s₀=0, s₁=0, s₂=0</button>
-            </div>
-          </div>
-
-          <div id="weightBarsOutput" style="margin-top:14px;"></div>
+          <ul style="margin:0;padding-left:18px;font-size:0.84rem;color:var(--fg-secondary);line-height:1.7;">
+            <li>
+              <span class="lang-en"><strong>Preserve failed intermediate stages ($s_{n,t}=0$):</strong> A failed retry often resolves one genuine error before hitting a deeper flaw, so it retains base temporal weight $\gamma^t$ rather than zero weight.</span>
+              <span class="lang-zh"><strong>保留失败中间阶段 ($s_{n,t}=0$)：</strong>即便后续重试仍未全对，该轮指导往往也已经修复了一处真实错误，因此保留权重 $\gamma^t$ 而不直接置零。</span>
+            </li>
+            <li>
+              <span class="lang-en"><strong>Outcome bonus ($\rho = 1.5$) + gentle decay ($\gamma = 0.8$):</strong> Prioritizes early clean repairs while reinforcing stages whose immediate retry passes final verification ($s_{n,t}=1$).</span>
+              <span class="lang-zh"><strong>结果奖励 ($\rho = 1.5$) 与适度时间衰减 ($\gamma = 0.8$)：</strong>适度偏向较早轮次的直接修复，同时强化能使紧随重试直接通过验证的修复阶段。</span>
+            </li>
+            <li>
+              <span class="lang-en"><strong>Unit per-trajectory normalization ($\sum_t w_{n,t} = 1$):</strong> Ensures every failed problem contributes equal total weight regardless of how many rounds $T_n + 1 \le K$ it took.</span>
+              <span class="lang-zh"><strong>单题归一化约束 ($\sum_t w_{n,t} = 1$)：</strong>避免多轮迭代样本在批次梯度中产生不成比例的权重放大。</span>
+            </li>
+          </ul>
         </div>
 
-        <!-- Right: Algorithm 1 & Prompt Templates -->
-        <div class="card" style="display:flex;flex-direction:column;">
+        <div class="card">
           <div class="card-header">
-            <h3 class="card-title">Algorithm &amp; Verbatim Prompt Templates</h3>
-            <div class="btn-group" id="promptTabs">
-              <button class="seg-btn active" data-pt="alg">Algorithm 1</button>
-              <button class="seg-btn" data-pt="round1">Round 1 Generator</button>
-              <button class="seg-btn" data-pt="round2">Round 2–3 Replacement</button>
-              <button class="seg-btn" data-pt="dialogue">Student Retry Turn</button>
+            <h3 class="card-title">
+              <span class="lang-en">Example Breakdown &amp; Measured Ablation</span>
+              <span class="lang-zh">两阶段示例权重分配与消融实测</span>
+            </h3>
+            <span class="pill pill-ok">Default: 65.8%</span>
+          </div>
+          <p style="font-size:0.83rem;color:var(--fg-secondary);margin-top:0;">
+            <span class="lang-en">For a 2-stage repair where Round 0 resolves the first error ($s_0 = 0$) and Round 1 passes verification ($s_1 = 1$) under default $\gamma=0.8, \rho=1.5$:</span>
+            <span class="lang-zh">以第 0 轮修复首错后仍失败 ($s_0 = 0$)、第 1 轮重试通过验证 ($s_1 = 1$) 的两阶段修复为例（默认 $\gamma=0.8, \rho=1.5$）：</span>
+          </p>
+
+          <div style="margin:12px 0 16px;">
+            <div class="bar-row" style="margin-bottom:10px;">
+              <div class="bar-row-top">
+                <span><strong>Stage 0</strong> ($t=0, s_0=0$)</span>
+                <span style="font-family:var(--font-mono);font-weight:700;color:#2563eb;">w̃₀ = 1.00 → w₀ = 0.455 (45.5%)</span>
+              </div>
+              <div class="bar-track" style="height:10px;">
+                <div class="bar-fill" style="width:45.5%;background:#2563eb;"></div>
+              </div>
+            </div>
+            <div class="bar-row" style="margin-bottom:4px;">
+              <div class="bar-row-top">
+                <span><strong>Stage 1</strong> ($t=1, s_1=1$ ★)</span>
+                <span style="font-family:var(--font-mono);font-weight:700;color:#ea580c;">w̃₁ = 0.80×1.5 = 1.20 → w₁ = 0.545 (54.5%)</span>
+              </div>
+              <div class="bar-track" style="height:10px;">
+                <div class="bar-fill" style="width:54.5%;background:#ea580c;"></div>
+              </div>
             </div>
           </div>
-          <div id="promptBoxContent" class="code-box" style="flex:1;max-height:390px;overflow:auto;font-size:0.77rem;"></div>
+
+          <div class="table-wrap">
+            <table class="data-table" style="font-size:0.8rem;">
+              <thead>
+                <tr>
+                  <th>Weighting Config $(\gamma, \rho)$</th>
+                  <th>Math Avg.</th>
+                  <th>Δ vs. Uniform</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Uniform $(1.0, 1.0)$</td><td>65.0%</td><td>—</td></tr>
+                <tr><td>Temporal Decay Only $(0.8, 1.0)$</td><td>65.4%</td><td>+0.4</td></tr>
+                <tr><td>Outcome Bonus Only $(1.0, 1.5)$</td><td>65.4%</td><td>+0.4</td></tr>
+                <tr class="row-highlight"><td><strong>AIR-OPD Default $(0.8, 1.5)$</strong></td><td><strong>65.8%</strong></td><td><span class="delta-pos">+0.8</span></td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -2159,204 +2211,6 @@ Simplifying by \\(\\gcd(10620, 29070) = 90\\):
         renderCaseStudy();
       });
       renderCaseStudy();
-
-      // =========================================================================
-      // Section 05: Outcome-Aware Stage Weighting Calculator & Prompt Viewer
-      // =========================================================================
-      let gamma = 0.80;
-      let rho = 1.50;
-      let scenario = "r2_pass";
-
-      function renderWeights() {
-        document.getElementById("gammaVal").textContent = gamma.toFixed(2);
-        document.getElementById("rhoVal").textContent = rho.toFixed(2);
-
-        let stages = [];
-        if (scenario === "r2_pass") {
-          stages = [
-            { t: 0, s: 0, desc: "Stage 0 (Initial y₀; Retry y₁ still wrong → s₀ = 0)" },
-            { t: 1, s: 1, desc: "Stage 1 (Retry y₁; Retry y₂ verified correct → s₁ = 1 ★)" }
-          ];
-        } else if (scenario === "r3_pass") {
-          stages = [
-            { t: 0, s: 0, desc: "Stage 0 (Initial y₀; Retry y₁ wrong → s₀ = 0)" },
-            { t: 1, s: 0, desc: "Stage 1 (Retry y₁; Retry y₂ wrong → s₁ = 0)" },
-            { t: 2, s: 1, desc: "Stage 2 (Retry y₂; Retry y₃ verified correct → s₂ = 1 ★)" }
-          ];
-        } else {
-          stages = [
-            { t: 0, s: 0, desc: "Stage 0 (Initial y₀; Retry y₁ wrong → s₀ = 0)" },
-            { t: 1, s: 0, desc: "Stage 1 (Retry y₁; Retry y₂ wrong → s₁ = 0)" },
-            { t: 2, s: 0, desc: "Stage 2 (Final round K=3; no further retry → s₂ = 0)" }
-          ];
-        }
-
-        const rawW = stages.map(st => Math.pow(gamma, st.t) * Math.pow(rho, st.s));
-        const sumW = rawW.reduce((a, b) => a + b, 0);
-
-        const out = document.getElementById("weightBarsOutput");
-        out.innerHTML = stages.map((st, idx) => {
-          const w = rawW[idx] / sumW;
-          const pct = (w * 100).toFixed(1);
-          const color = st.s === 1 ? "#ea580c" : "#2563eb";
-          return `
-            <div class="bar-row" style="margin-bottom:12px;">
-              <div class="bar-row-top">
-                <span><strong>${st.desc}</strong></span>
-                <span style="font-family:var(--font-mono);font-weight:700;color:${color};">
-                  w̃_${st.t} = ${rawW[idx].toFixed(2)} → w_${st.t} = ${w.toFixed(3)} (${pct}%)
-                </span>
-              </div>
-              <div class="bar-track" style="height:12px;">
-                <div class="bar-fill" style="width:${pct}%;background:${color};"></div>
-              </div>
-            </div>
-          `;
-        }).join("") + `
-          <div style="font-size:0.78rem;color:var(--muted);font-family:var(--font-mono);margin-top:8px;">
-            Normalized trajectory sum: ∑ w_t = 1.000 (prevents multi-round trajectories from inflating batch gradients).
-          </div>
-        `;
-      }
-
-      document.getElementById("weightPresetBtns").addEventListener("click", (e) => {
-        const btn = e.target.closest(".seg-btn");
-        if (!btn) return;
-        document.querySelectorAll("#weightPresetBtns .seg-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        gamma = parseFloat(btn.dataset.g);
-        rho = parseFloat(btn.dataset.r);
-        document.getElementById("gammaSlider").value = gamma;
-        document.getElementById("rhoSlider").value = rho;
-        renderWeights();
-      });
-
-      document.getElementById("gammaSlider").addEventListener("input", (e) => {
-        gamma = parseFloat(e.target.value);
-        document.querySelectorAll("#weightPresetBtns .seg-btn").forEach(b => b.classList.remove("active"));
-        renderWeights();
-      });
-
-      document.getElementById("rhoSlider").addEventListener("input", (e) => {
-        rho = parseFloat(e.target.value);
-        document.querySelectorAll("#weightPresetBtns .seg-btn").forEach(b => b.classList.remove("active"));
-        renderWeights();
-      });
-
-      document.getElementById("scenarioBtns").addEventListener("click", (e) => {
-        const btn = e.target.closest(".seg-btn");
-        if (!btn) return;
-        document.querySelectorAll("#scenarioBtns .seg-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        scenario = btn.dataset.scen;
-        renderWeights();
-      });
-      renderWeights();
-
-      // Prompt & Algorithm Tabs
-      const PROMPTS = {
-        alg: `// Algorithm 1: AIR-OPD Multi-Round Repair & Stage-Weighted Distillation
-Input: Minibatch B of (problem q, reference solution z), student p_θ, frozen teacher p_T,
-       outcome verifier V, guidance generator G
-Hyperparameters: repair budget K = 3, tolerance ε = 0.1, temporal γ = 0.8, bonus ρ = 1.5
-
-for each (q, z) in B (indexed by n) do:
-  S_n ← ∅,  t ← 0,  H_0 ← Render(q)
-  Sample initial on-policy response y_0 ~ p_θ(· | H_0)
-
-  while t < K and y_t is well-formed with V(y_t) == 0 do:
-    (a_t, g_t) ← G(q, z, H_t, y_t)
-    if (a_t, g_t) fails format / verbatim-anchor / answer-leak validation:
-      break
-    b_t ← exact match start position of anchor a_t in y_t
-    e_t ← earliest blank-line block endpoint retaining ≥ (1 - ε) of corrective mass C_{t,j}
-    Compute stage KL loss L_{n,t} over repair region R_t = y_t[b_t : e_t]
-    Add (t, L_{n,t}) to S_n
-    H_{t+1} ← Update(H_t, y_t, g_t)
-    if t < K - 1:
-      Sample on-policy retry y_{t+1} ~ p_θ(· | H_{t+1})
-    s_{n,t} ← 1 if V(y_{t+1}) == 1 else 0   (0 if no retry was sampled)
-    t ← t + 1
-
-  if S_n ≠ ∅:
-    w_{n,t} ← (γ^t · ρ^{s_{n,t}}) / ∑_{k=0}^{T_n} (γ^k · ρ^{s_{n,k}})
-    L_n ← ∑_{t=0}^{T_n} w_{n,t} · L_{n,t}
-
-return L_AIR-OPD = (1 / |B|) ∑_{n ∈ B} L_n`,
-        round1: `[Problem]
-{problem}
-[Private Correct Final Answer]
-{private_answer}
-[Reference Solution]
-{private_reference_solution}
-[QUOTE SOURCE - Incorrect Solution]
-{incorrect_response}
-------------------------------------------------------------------------
-Diagnose [QUOTE SOURCE - Incorrect Solution] using the Reference Solution and
-the Private Correct Final Answer as privileged checking evidence. First decide
-whether the quoted response is mathematically correct.
-
-If the response is not mathematically correct, identify the earliest causal
-mathematical error that still affects the conclusion. The <error_quote> MUST
-contain only a short, verbatim, contiguous substring copied from
-[QUOTE SOURCE - Incorrect Solution].
-
-The <repair_guidance> must identify the exact mistake, explain how to fix it,
-and state the correct governing logic. It must be problem-specific, actionable,
-answer-free, and must not reproduce a complete corrected solution or reveal the
-final answer.
-
-Respond strictly in one of these forms:
-<decision>no_repair</decision>
-or:
-<decision>repair</decision>
-<error_quote>A short exact substring copied from QUOTE SOURCE</error_quote>
-<repair_guidance>Identify the exact mistake and state the governing logic without revealing the final answer</repair_guidance>`,
-        round2: `[Problem]
-{problem}
-[Private Correct Final Answer]
-{private_answer}
-[Reference Solution]
-{private_reference_solution}
-[QUOTE SOURCE - Latest Response]
-{latest_incorrect_response}
-[Current Repair Guidance]
-{current_repair_guidance}
-------------------------------------------------------------------------
-Diagnose [QUOTE SOURCE - Latest Response] after Current Repair Guidance has
-been applied. If the latest response is mathematically correct, output no_repair.
-
-If it is not mathematically correct, write a replacement repair guidance:
-identify the earliest remaining causal mathematical error that still affects the
-conclusion, correct only that bottleneck, and give exactly one next operation
-the solver can perform. Do not merely restate a correction that has already been
-executed. Preserve still-valid prior guidance and replace guidance that is now
-misleading.`,
-        dialogue: `=== Initial User Turn (H_0) ===
-Problem: {problem}
-Please reason step by step, and put your final answer within \\boxed{}.
-
-=== Feedback Turn Appended After Unsuccessful Response y_t (H_{t+1}) ===
-The previous answer is incorrect.  [Round 2+: "The previous answer is still incorrect."]
-
-Use the following repair guidance, which explains how to correct the reasoning:
-=== Repair Guidance Begin ===
-{current_repair_guidance}
-=== Repair Guidance End ===
-
-Revise the reasoning and answer again. Do not simply repeat the previous attempt.
-Please reason step by step, and put your final answer within \\boxed{}.`
-      };
-
-      const promptBox = document.getElementById("promptBoxContent");
-      promptBox.textContent = PROMPTS.alg;
-      document.getElementById("promptTabs").addEventListener("click", (e) => {
-        const btn = e.target.closest(".seg-btn");
-        if (!btn) return;
-        document.querySelectorAll("#promptTabs .seg-btn").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        promptBox.textContent = PROMPTS[btn.dataset.pt] || "";
-      });
 
       // =========================================================================
       // Section 06: Empirical Results Tabs
