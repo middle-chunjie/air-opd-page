@@ -1318,8 +1318,11 @@
             </h3>
             <span class="pill pill-ext">§3.3 Stage Weights</span>
           </div>
-          <div class="formula-box" style="margin-bottom:14px;">
-            $$w_{n,t} \;=\; \frac{\gamma^t \, \rho^{s_{n,t}}}{\sum_{k=0}^{T_n} \gamma^k \, \rho^{s_{n,k}}}, \qquad \gamma = 0.8,\;\; \rho = 1.5,\;\; s_{n,t} = \mathbb{I}\!\left[V(y_{n,t+1}) = 1\right]$$
+          <div class="formula-box" style="margin-bottom:14px;font-size:0.86rem;line-height:1.7;">
+            $$w_{n,t} \;=\; \frac{\gamma^t \, \rho^{s_{n,t}}}{\sum_{k=0}^{T_n} \gamma^k \, \rho^{s_{n,k}}}$$
+            <div style="margin-top:6px;font-size:0.8rem;color:var(--fg-secondary);">
+              Default: $\gamma = 0.8$, $\rho = 1.5$, and $s_{n,t} = \mathbb{I}[V(y_{n,t+1}) = 1]$
+            </div>
           </div>
           <ul style="margin:0;padding-left:18px;font-size:0.84rem;color:var(--fg-secondary);line-height:1.7;">
             <li>
@@ -1375,9 +1378,9 @@
             <table class="data-table" style="font-size:0.8rem;">
               <thead>
                 <tr>
-                  <th>Weighting Config $(\gamma, \rho)$</th>
+                  <th>Weighting Config <span style="text-transform:none;">$(\gamma, \rho)$</span></th>
                   <th>Math Avg.</th>
-                  <th>Δ vs. Uniform</th>
+                  <th><span style="text-transform:none;">Δ</span> vs. Uniform</th>
                 </tr>
               </thead>
               <tbody>
